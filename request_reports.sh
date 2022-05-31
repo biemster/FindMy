@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 ids='["123","456"]'
 
 searchPartyToken=$(security find-generic-password -w -s 'com.apple.account.AppleAccount.search-party-token')
