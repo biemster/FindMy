@@ -16,12 +16,13 @@ userAgent="searchpartyd/1 <$model>/<$swver>"
 
 clientTime=$(date +%Y-%m-%dT%H:%M:%S%z)
 timeZone=$(date +%Z)
-unixEpoch=$(($(date +%s) * 1000))
-startDate=$(bc <<<"$unixEpoch - (86400000*7)")
+unixEpoch=$(date +%s)
+endDate=$(($unixEpoch * 1000))
+startDate=$(bc <<<"$endDate - (86400000*7)")
 
 auth_b64=$(echo "$AppleID_UUID:$searchPartyToken" | base64)
 
-data="{\"search\": [{\"endDate\": $unixEpoch, \"startDate\": $startDate, \"ids\": $ids}]}"
+data="{\"search\": [{\"endDate\": $endDate, \"startDate\": $startDate, \"ids\": $ids}]}"
 
 echo $clientTime $timeZone $unixEpoch
 echo "AppleID_UUID:" $AppleID_UUID
