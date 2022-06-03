@@ -2,11 +2,9 @@
 Query Apple's Find My network, based on all the hard work of https://github.com/seemoo-lab/openhaystack/ and others.
 
 ## Install
-Installation is just 2 easy steps (4 if you don't have a Mac and Apple ID)
-0. Generate an Apple ID, and instal the Catalina Pre-installed docker image from https://github.com/sickcodes/Docker-OSX#run-catalina-pre-installed-
-1. Download the latest release of `cook` from https://github.com/n3d1117/cook, and follow the install instructions from there. Run like this:
-```
-./cook anisette_server --secret anisette
-```
+Installation requires XCode (for as long as I need to figure out how to use python ctypes on AOSKit), a Mac (real or virtual) and an Apple ID
+
+0. Generate an Apple ID, and instal the Catalina Pre-installed docker image from https://github.com/sickcodes/Docker-OSX#run-catalina-pre-installed-, and login to iCloud using your AppleID
+1. Clone and build https://github.com/biemster/AppleIDAuth (you will have to change the build phase copy of `AOSKit` to the directory you are running this script in)
 2. Add your public keys to `request_reports.sh` at the top, and run (only internal tools are used, no dependencies)
 
