@@ -5,7 +5,7 @@ ids='["123","456"]'
 AppleID_UUID=$(security find-generic-password -s 'iCloud' | awk -F\" '/acct/{print $(NF-1)}')
 searchPartyToken=$(security find-generic-password -w -s 'com.apple.account.AppleAccount.search-party-token')
 
-anisette=$(./AOSKit 2>&1)
+anisette=$(./retrieveOTPHeadersForDSID.py)
 machineID=$(echo "$anisette" | awk -F\" '/X-Apple-MD-M\"/{print $(NF-1)}')
 oneTimePassword=$(echo "$anisette" | awk -F\" '/X-Apple-MD\"/{print $(NF-1)}')
 
