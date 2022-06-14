@@ -1,5 +1,5 @@
 # FindMy
-Query Apple's Find My network, based on all the hard work of https://github.com/seemoo-lab/openhaystack/ and @vtky and others.
+Query Apple's Find My network, based on all the hard work of https://github.com/seemoo-lab/openhaystack/ and @vtky and @hatomist and others.
 
 ## Install and Run
 To install just clone this repo, to run a Mac (real or virtual) and an Apple ID are required
