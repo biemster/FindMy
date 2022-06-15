@@ -1,6 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 import sys,base64,hashlib,random
 from p224 import scalar_mult,curve
+
+def int_to_bytes(n, length, endianess='big'):
+    h = '%x' % n
+    s = ('0'*(len(h) % 2) + h).zfill(length*2).decode('hex')
+    return s if endianess == 'big' else s[::-1]
 
 def sha256(data):
     digest = hashlib.new("sha256")
@@ -16,18 +21,22 @@ for i in range(nkeys):
     priv = random.getrandbits(224)
     adv,_ = scalar_mult(priv, curve.g)
 
-    adv_b64 = base64.b64encode(adv.to_bytes(28, "big")).decode("ascii")
-    s256_b64 = base64.b64encode(sha256(adv.to_bytes(28, "big"))).decode("ascii")
+    priv_bytes = int_to_bytes(priv, 28)
+    adv_bytes = int_to_bytes(adv, 28)
 
-    print(f'{i+1})')
-    print(f'Private key: {base64.b64encode(priv.to_bytes(28, "big")).decode("ascii")}')
-    print(f'Advertisement key: {adv_b64}')
-    print(f'Hashed adv key: {s256_b64}')
+    priv_b64 = base64.b64encode(priv_bytes).decode("ascii")
+    adv_b64 = base64.b64encode(adv_bytes).decode("ascii")
+    s256_b64 = base64.b64encode(sha256(adv_bytes)).decode("ascii")
+
+    print('%d)' % (i+1))
+    print('Private key: %s' % priv_b64)
+    print('Advertisement key: %s' % adv_b64)
+    print('Hashed adv key: %s' % s256_b64)
     if '/' in s256_b64[:7]:
         print('no key file written, there was a / in the b64 of the hashed pubkey :(')
     else:
-        with open(f'{s256_b64[:7]}.keys', 'w') as f:
-            f.write(f'Private key: {base64.b64encode(priv.to_bytes(28, "big")).decode("ascii")}\n')
-            f.write(f'Advertisement key: {adv_b64}\n')
-            f.write(f'Hashed adv key: {s256_b64}\n')
+        with open('%s.keys' % s256_b64[:7], 'w') as f:
+            f.write('Private key: %s\n' % priv_b64)
+            f.write('Advertisement key: %s\n' % adv_b64)
+            f.write('Hashed adv key: %s\n' % s256_b64)
 
