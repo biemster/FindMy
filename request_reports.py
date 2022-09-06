@@ -45,8 +45,8 @@ def getOTPHeaders():
     objc.loadBundleFunctions(AOSKitBundle, globals(), [("retrieveOTPHeadersForDSID", '')])
     util = NSClassFromString('AOSUtilities')
 
-    anisette = str(util.retrieveOTPHeadersForDSID_("-2")).split('"')
-    return anisette[7], anisette[3]
+    anisette = str(util.retrieveOTPHeadersForDSID_("-2")).replace('"', ' ').replace(';', ' ').split()
+    return anisette[6], anisette[3]
 
 def getCurrentTimes():
     import datetime, time
