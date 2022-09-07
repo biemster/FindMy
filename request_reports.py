@@ -1,7 +1,15 @@
 #!/usr/bin/env python2
-import subprocess,json,glob
-import base64,hashlib,codecs,struct
+import os,glob
+import base64,json
+import hashlib,hmac
+import codecs,struct
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.padding import PKCS7
+from cryptography.hazmat.backends import default_backend
+import objc
+from Foundation import NSBundle, NSClassFromString, NSData, NSPropertyListSerialization
 from p224 import scalar_mult,curve
+
 
 def bytes_to_int(b):
     return int(codecs.encode(b, 'hex'), 16)
@@ -16,12 +24,8 @@ def sha256(data):
     digest.update(data)
     return digest.digest()
 
-def decrypt_payload(enc_data, symmetric_key, tag):
-    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-    from cryptography.hazmat.backends import default_backend
-    decryption_key = symmetric_key[:16]
-    iv = symmetric_key[16:]
-    cipher = Cipher(algorithms.AES(decryption_key), modes.GCM(iv, tag), default_backend())
+def decrypt_AES(enc_data, dkey, mode):
+    cipher = Cipher(algorithms.AES(dkey), mode, default_backend())
     decryptor = cipher.decryptor()
     return decryptor.update(enc_data) + decryptor.finalize()
 
@@ -31,16 +35,18 @@ def decode_tag(data):
     confidence = bytes_to_int(data[8:9])
     return {'lat': latitude, 'lon': longitude, 'conf': confidence}
 
-def getAppleIDUUID():
-    iCloud_keys = subprocess.check_output(['/usr/bin/security', 'find-generic-password', '-s', 'iCloud'])
-    acct_start = iCloud_keys[iCloud_keys.find('"acct"<blob>="') +len('"acct"<blob>="'):]
-    return acct_start[:acct_start.find('"')]
-
-def getSearchPartyToken():
-    return subprocess.check_output(['/usr/bin/security', 'find-generic-password', '-w', '-s', 'com.apple.account.AppleAccount.search-party-token']).rstrip('\n')
+def getAppleDSIDandSearchPartyToken(iCloudKey):
+    # copied from https://github.com/Hsn723/MMeTokenDecrypt
+    decryption_key = hmac.new("t9s\"lx^awe.580Gj%'ld+0LG<#9xa?>vb)-fkwb92[}", base64.b64decode(iCloudKey), digestmod=hashlib.md5).digest()
+    mmeTokenFile = glob.glob("%s/Library/Application Support/iCloud/Accounts/[0-9]*" % os.path.expanduser("~"))[0]
+    decryptedBinary = decrypt_AES(open(mmeTokenFile, 'rb').read(), decryption_key, modes.CBC(b'\00' *16));
+    unpadder = PKCS7(algorithms.AES.block_size).unpadder()
+    decryptedBinary = unpadder.update(decryptedBinary) + unpadder.finalize()
+    binToPlist = NSData.dataWithBytes_length_(decryptedBinary, len(decryptedBinary))
+    tokenPlist = NSPropertyListSerialization.propertyListWithData_options_format_error_(binToPlist, 0, None, None)[0]
+    return tokenPlist["appleAccountInfo"]["dsPrsID"], tokenPlist["tokens"]['searchPartyToken']
 
 def getOTPHeaders():
-    import objc; from Foundation import NSBundle, NSClassFromString
     AOSKitBundle = NSBundle.bundleWithPath_('/System/Library/PrivateFrameworks/AOSKit.framework')
     objc.loadBundleFunctions(AOSKitBundle, globals(), [("retrieveOTPHeadersForDSID", '')])
     util = NSClassFromString('AOSUtilities')
@@ -56,13 +62,14 @@ def getCurrentTimes():
 
 
 if __name__ == "__main__":
-    AppleID_UUID = getAppleIDUUID()
-    searchPartyToken = getSearchPartyToken()
+    from getpass import getpass
+    iCloud_decryptionkey = getpass("Enter your iCloud decryption key ($ security find-generic-password -ws 'iCloud'):")
+    AppleDSID,searchPartyToken = getAppleDSIDandSearchPartyToken(iCloud_decryptionkey)
     machineID, oneTimePassword = getOTPHeaders()
     UTCTime, Timezone, unixEpoch = getCurrentTimes()
 
     request_headers = {
-        'Authorization': "Basic %s" % (base64.b64encode((AppleID_UUID + ':' + searchPartyToken).encode('ascii')).decode('ascii')),
+        'Authorization': "Basic %s" % (base64.b64encode((AppleDSID + ':' + searchPartyToken).encode('ascii')).decode('ascii')),
         'X-Apple-I-MD': "%s" % (oneTimePassword),
         'X-Apple-I-MD-RINFO': '17106176',
         'X-Apple-I-MD-M': "%s" % (machineID) ,
@@ -111,11 +118,12 @@ if __name__ == "__main__":
         eph_key = (bytes_to_int(data[6:34]), bytes_to_int(data[34:62]))
         shared_key = scalar_mult(priv, eph_key)
         symmetric_key = sha256(int_to_bytes(shared_key[0], 28) + int_to_bytes(1, 4) + data[5:62])
+        decryption_key = symmetric_key[:16]
+        iv = symmetric_key[16:]
         enc_data = data[62:72]
         tag = data[72:]
 
-        decrypted = decrypt_payload(enc_data, symmetric_key, tag)
+        decrypted = decrypt_AES(enc_data, decryption_key, modes.GCM(iv, tag))
         res = decode_tag(decrypted)
         res['timestamp'] = timestamp + 978307200
         print report['id'] + ': ' + str(res)
-
