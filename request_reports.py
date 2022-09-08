@@ -9,7 +9,8 @@ from cryptography.hazmat.backends import default_backend
 import objc
 from Foundation import NSBundle, NSClassFromString, NSData, NSPropertyListSerialization
 from p224 import scalar_mult,curve
-
+from datetime import datetime
+import argparse
 
 def bytes_to_int(b):
     return int(codecs.encode(b, 'hex'), 16)
@@ -33,7 +34,8 @@ def decode_tag(data):
     latitude = struct.unpack(">i", data[0:4])[0] / 10000000.0
     longitude = struct.unpack(">i", data[4:8])[0] / 10000000.0
     confidence = bytes_to_int(data[8:9])
-    return {'lat': latitude, 'lon': longitude, 'conf': confidence}
+    status = bytes_to_int(data[9:10])
+    return {'lat': latitude, 'lon': longitude, 'conf': confidence, 'status':status}
 
 def getAppleDSIDandSearchPartyToken(iCloudKey):
     # copied from https://github.com/Hsn723/MMeTokenDecrypt
@@ -62,8 +64,16 @@ def getCurrentTimes():
 
 
 if __name__ == "__main__":
-    from getpass import getpass
-    iCloud_decryptionkey = getpass("Enter your iCloud decryption key ($ security find-generic-password -ws 'iCloud'):")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-H', '--hours', help='only show reports not older than these hours', type=int, default=24)
+    parser.add_argument('-p', '--prefix', help='only use keyfiles starting with this prefix', default='')
+    parser.add_argument('-k', '--key', help='iCloud decryption key')
+    args=parser.parse_args()
+    if args.key is None:
+      from getpass import getpass
+      iCloud_decryptionkey = getpass("Enter your iCloud decryption key ($ security find-generic-password -ws 'iCloud'):")
+    else:
+      iCloud_decryptionkey = args.key
     AppleDSID,searchPartyToken = getAppleDSIDandSearchPartyToken(iCloud_decryptionkey)
     machineID, oneTimePassword = getOTPHeaders()
     UTCTime, Timezone, unixEpoch = getCurrentTimes()
@@ -81,11 +91,14 @@ if __name__ == "__main__":
     }
 
     ids = {}
-    for keyfile in glob.glob('./*keys'):
+    names = {}
+    found = {}
+    for keyfile in glob.glob(args.prefix+'*.keys'):
         # read key files generated with generate_keys.py
         with open(keyfile) as f:
             hashed_adv = ''
             priv = ''
+            name = keyfile[:-5]
             for line in f:
                 key = line.rstrip('\n').split(': ')
                 if key[0] == 'Private key':
@@ -95,10 +108,17 @@ if __name__ == "__main__":
 
             if priv and hashed_adv:
                 ids[hashed_adv] = priv
+                names[hashed_adv] = name
+                subkey=name[len(args.prefix):]
+                found[subkey] = False
             else:
                 print "Couldn't find key pair in " + keyfile
 
-    data = '{"search": [{"endDate": %d, "startDate": %d, "ids": %s}]}' % (unixEpoch *1000, (unixEpoch *1000) -(86400000 *7), ids.keys())
+    print "keys ", len(ids)
+    enddate = unixEpoch
+    startdate = enddate - 60 * 60 * args.hours
+    coco = 978307200
+    data = '{"search": [{"endDate": %d, "startDate": %d, "ids": %s}]}' % ((enddate-coco) *1000000, (startdate-coco)*1000000, ids.keys())
 
     # send out the whole thing
     import httplib, urllib
@@ -109,21 +129,48 @@ if __name__ == "__main__":
     res = json.loads(response.read())['results']
     print '%d reports received.' % len(res)
 
+    ordered = []
     for report in res:
         priv = bytes_to_int(base64.b64decode(ids[report['id']]))
         data = base64.b64decode(report['payload'])
 
         # the following is all copied from https://github.com/hatomist/openhaystack-python, thanks @hatomist!
         timestamp = bytes_to_int(data[0:4])
-        eph_key = (bytes_to_int(data[6:34]), bytes_to_int(data[34:62]))
-        shared_key = scalar_mult(priv, eph_key)
-        symmetric_key = sha256(int_to_bytes(shared_key[0], 28) + int_to_bytes(1, 4) + data[5:62])
-        decryption_key = symmetric_key[:16]
-        iv = symmetric_key[16:]
-        enc_data = data[62:72]
-        tag = data[72:]
+        if timestamp + 978307200 >= startdate:
+          eph_key = (bytes_to_int(data[6:34]), bytes_to_int(data[34:62]))
+          shared_key = scalar_mult(priv, eph_key)
+          symmetric_key = sha256(int_to_bytes(shared_key[0], 28) + int_to_bytes(1, 4) + data[5:62])
+          decryption_key = symmetric_key[:16]
+          iv = symmetric_key[16:]
+          enc_data = data[62:72]
+          tag = data[72:]
 
-        decrypted = decrypt_AES(enc_data, decryption_key, modes.GCM(iv, tag))
-        res = decode_tag(decrypted)
-        res['timestamp'] = timestamp + 978307200
-        print report['id'] + ': ' + str(res)
+          decrypted = decrypt_AES(enc_data, decryption_key, modes.GCM(iv, tag))
+          res = decode_tag(decrypted)
+          res['timestamp'] = timestamp + 978307200
+          res['isodatetime'] = datetime.fromtimestamp(res['timestamp']).isoformat()
+          name=names[report['id']]
+          if args.prefix:
+            res['key'] = name[len(args.prefix)]
+            found[res['key']]=True
+          res['goog'] = 'https://maps.google.com/maps?q='+str(res['lat'])+','+str(res['lon'])
+          #print str(res)
+          ordered.append(res)
+    print '%d reports used.' % len(ordered)
+    ordered.sort(key=lambda item: item.get('timestamp'))
+    for x in ordered:
+        print x
+
+if args.prefix:
+  f = []
+  m = []
+  for x in found:
+    if found[x]:
+      f.append(x)
+    else:
+      m.append(x)
+
+  f.sort(key=lambda x: (len(x),x))
+  m.sort(key=lambda x: (len(x),x))
+  print "missing ", len(m),': ', ', '.join(m)
+  print "found   ", len(f),': ',', '.join(f)
