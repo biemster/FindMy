@@ -14,20 +14,18 @@ def sha256(data):
     return digest.digest()
 
 
-
 parser = argparse.ArgumentParser()
-parser.add_argument('-k','--keys', help='number of keys to generate', type=int, default=1)
-parser.add_argument('-n','--name', help='name (prefix) of the keyfiles')
+parser.add_argument('-n','--nkeys', help='number of keys to generate', type=int, default=1)
+parser.add_argument('-p','--prefix', help='prefix of the keyfiles')
 parser.add_argument('-y','--yaml', help='yaml file where to write the list of generated keys')
 parser.add_argument('-v','--verbose', help='print keys as they are generated', action="store_true")
-args=parser.parse_args()
+args = parser.parse_args()
 
-if args.yaml is not None:
-  yaml=open(args.yaml+'.yaml','w')
-  yaml.write('  keys:\n')
+if args.yaml:
+    yaml=open(args.yaml + '.yaml','w')
+    yaml.write('  keys:\n')
 
-i=1
-while i<=args.keys:
+for i in range(args.nkeys):
     priv = random.getrandbits(224)
     adv,_ = scalar_mult(priv, curve.g)
 
@@ -39,21 +37,23 @@ while i<=args.keys:
     s256_b64 = base64.b64encode(sha256(adv_bytes)).decode("ascii")
 
     if args.verbose:
-      print('%d)' % (i))
-      print('Private key: %s' % priv_b64)
-      print('Advertisement key: %s' % adv_b64)
-      print('Hashed adv key: %s' % s256_b64)
+        print('%d)' % (i+1))
+        print('Private key: %s' % priv_b64)
+        print('Advertisement key: %s' % adv_b64)
+        print('Hashed adv key: %s' % s256_b64)
+
     if '/' in s256_b64[:7]:
         print('no key file written, there was a / in the b64 of the hashed pubkey :(')
     else:
-        if args.name:
-          fname = '%s_%d.keys' % (args.name, i)
+        if args.prefix:
+            fname = '%s_%s.keys' % (args.prefix, s256_b64[:7])
         else:
-          fname = '%s.keys' % s256_b64[:7]
+            fname = '%s.keys' % s256_b64[:7]
+
         with open(fname, 'w') as f:
             f.write('Private key: %s\n' % priv_b64)
             f.write('Advertisement key: %s\n' % adv_b64)
             f.write('Hashed adv key: %s\n' % s256_b64)
-        i = i +1
-        if args.yaml is not None:
-          yaml.write('    - "%s"\n' % adv_b64)
+
+        if args.yaml:
+            yaml.write('    - "%s"\n' % adv_b64)
