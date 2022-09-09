@@ -98,9 +98,10 @@ def readKeychain():
                     res[6] = db_key_blob[120:168]
     return res
 
-def retrieveICloudKey():
+def retrieveICloudKey(password):
     icloud_key_IV, icloud_key_enc, symmetric_key_IV, symmetric_key_enc, db_key_salt, db_key_IV, db_key_enc = readKeychain()
-    password = getpass.getpass('Keychain password:')
+    if not password:
+        password = getpass.getpass('Keychain password:')
     master_key = PBKDF2HMAC(algorithm=hashes.SHA1(), length=24, salt=db_key_salt, iterations=1000, backend=default_backend()).derive(bytes(password))
     db_key = unpad(decrypt(db_key_enc, algorithms.TripleDES(master_key), modes.CBC(db_key_IV)), algorithms.TripleDES.block_size)[:24]
     p1 = unpad(decrypt(symmetric_key_enc, algorithms.TripleDES(db_key), modes.CBC('J\xdd\xa2,y\xe8!\x05')), algorithms.TripleDES.block_size)
@@ -135,8 +136,11 @@ if __name__ == "__main__":
     parser.add_argument('-H', '--hours', help='only show reports not older than these hours', type=int, default=24)
     parser.add_argument('-p', '--prefix', help='only use keyfiles starting with this prefix', default='')
     parser.add_argument('-k', '--key', help="iCloud decryption key ($ security find-generic-password -ws 'iCloud')")
+    parser.add_argument('-P', '--password', help="keychain password")
     args = parser.parse_args()
-    iCloud_decryptionkey = args.key if args.key else retrieveICloudKey()
+    if args.key and args.password:
+        raise parser.error("only one of --key and --password can be specified")
+    iCloud_decryptionkey = args.key if args.key else retrieveICloudKey(args.password)
 
     AppleDSID,searchPartyToken = getAppleDSIDandSearchPartyToken(iCloud_decryptionkey)
     machineID, oneTimePassword = getOTPHeaders()
