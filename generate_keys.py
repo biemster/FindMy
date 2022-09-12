@@ -1,5 +1,7 @@
 #!/usr/bin/env python2
 import sys,base64,hashlib,random
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.backends import default_backend
 from p224 import scalar_mult,curve
 import argparse
 
@@ -27,7 +29,7 @@ if args.yaml:
 
 for i in range(args.nkeys):
     priv = random.getrandbits(224)
-    adv,_ = scalar_mult(priv, curve.g)
+    adv = ec.derive_private_key(priv, ec.SECP224R1(), default_backend()).public_key().public_numbers().x
 
     priv_bytes = int_to_bytes(priv, 28)
     adv_bytes = int_to_bytes(adv, 28)

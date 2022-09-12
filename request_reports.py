@@ -9,18 +9,13 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
 import objc
 from Foundation import NSBundle, NSClassFromString, NSData, NSPropertyListSerialization
-from p224 import scalar_mult,curve
 
 def bytes_to_int(b):
     return int(codecs.encode(b, 'hex'), 16)
-
-def int_to_bytes(n, length, endianess='big'):
-    h = '%x' % n
-    s = ('0'*(len(h) % 2) + h).zfill(length*2).decode('hex')
-    return s if endianess == 'big' else s[::-1]
 
 def sha256(data):
     digest = hashlib.new("sha256")
@@ -196,9 +191,9 @@ if __name__ == "__main__":
         # the following is all copied from https://github.com/hatomist/openhaystack-python, thanks @hatomist!
         timestamp = bytes_to_int(data[0:4])
         if timestamp + 978307200 >= startdate:
-            eph_key = (bytes_to_int(data[6:34]), bytes_to_int(data[34:62]))
-            shared_key = scalar_mult(priv, eph_key)
-            symmetric_key = sha256(int_to_bytes(shared_key[0], 28) + int_to_bytes(1, 4) + data[5:62])
+            eph_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP224R1(), data[5:62])
+            shared_key = ec.derive_private_key(priv, ec.SECP224R1(), default_backend()).exchange(ec.ECDH(), eph_key)
+            symmetric_key = sha256(shared_key + b'\x00\x00\x00\x01' + data[5:62])
             decryption_key = symmetric_key[:16]
             iv = symmetric_key[16:]
             enc_data = data[62:72]
