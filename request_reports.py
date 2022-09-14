@@ -1,8 +1,8 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 import os,glob
 import datetime, time
 import argparse,getpass
-import base64,json
+import base64
 import hashlib,hmac
 import codecs,struct
 from cryptography.hazmat.primitives import hashes
@@ -45,17 +45,17 @@ def readKeychain():
         def get_table_offsets(tbl_array_offset):
             ntables = bytes_to_int(kc[tbl_array_offset +4 : tbl_array_offset +8])
             tbl_offsets_b = kc[tbl_array_offset +8 : tbl_array_offset +8 +(ntables *4)]
-            return [bytes_to_int(tbl_offsets_b[i:i+4]) +tbl_array_offset for i in xrange(0, len(tbl_offsets_b), 4)]
+            return [bytes_to_int(tbl_offsets_b[i:i+4]) +tbl_array_offset for i in range(0, len(tbl_offsets_b), 4)]
 
         def get_record_offsets(tbl_start):
             nrecords = bytes_to_int(kc[tbl_start +24 : tbl_start +28])
             rec_offsets_b = kc[tbl_start +28 : tbl_start +28 +(nrecords *4)]
-            rec_offsets = [bytes_to_int(rec_offsets_b[i:i+4]) +tbl_start for i in xrange(0, len(rec_offsets_b), 4)]
+            rec_offsets = [bytes_to_int(rec_offsets_b[i:i+4]) +tbl_start for i in range(0, len(rec_offsets_b), 4)]
             return [ro for ro in rec_offsets if ro != tbl_start and bytes_to_int(kc[ro : ro +4])] # remove 0 offset records and empty records
 
         def match_record_attribute(rec_start, rec_nattr, rec_attr, attr_match):
             attr_offsets_b = kc[rec_start +24 : rec_start +24 +(rec_nattr *4)]
-            attr_offsets = [bytes_to_int(attr_offsets_b[i:i+4]) +rec_start -1 for i in xrange(0, len(attr_offsets_b), 4)]
+            attr_offsets = [bytes_to_int(attr_offsets_b[i:i+4]) +rec_start -1 for i in range(0, len(attr_offsets_b), 4)]
             if attr_offsets[0] and attr_offsets[0] < rec_start +bytes_to_int(kc[rec_start : rec_start +4]): # non-zero offset, and no weird big values
                 if kc[attr_offsets[rec_attr] +4 : attr_offsets[rec_attr] +4 +bytes_to_int(kc[attr_offsets[rec_attr] : attr_offsets[rec_attr] +4])] == attr_match:
                     return kc[rec_start +24 +(rec_nattr *4) : rec_start +24 +(rec_nattr *4) +bytes_to_int(kc[rec_start +16 : rec_start +20])] # return record blob data (NOTE not sure about BLOB size!!!)
@@ -95,7 +95,7 @@ def readKeychain():
 def retrieveICloudKey():
     icloud_key_IV, icloud_key_enc, symmetric_key_IV, symmetric_key_enc, db_key_salt, db_key_IV, db_key_enc = readKeychain()
     password = getpass.getpass('Keychain password:')
-    master_key = PBKDF2HMAC(algorithm=hashes.SHA1(), length=24, salt=db_key_salt, iterations=1000, backend=default_backend()).derive(bytes(password))
+    master_key = PBKDF2HMAC(algorithm=hashes.SHA1(), length=24, salt=db_key_salt, iterations=1000, backend=default_backend()).derive(bytes(password, encoding='ascii'))
     db_key = unpad(decrypt(db_key_enc, algorithms.TripleDES(master_key), modes.CBC(db_key_IV)), algorithms.TripleDES.block_size)[:24]
     p1 = unpad(decrypt(symmetric_key_enc, algorithms.TripleDES(db_key), modes.CBC(b'J\xdd\xa2,y\xe8!\x05')), algorithms.TripleDES.block_size)
     symmetric_key = unpad(decrypt(p1[:32][::-1], algorithms.TripleDES(db_key), modes.CBC(symmetric_key_IV)), algorithms.TripleDES.block_size)[4:]
@@ -113,7 +113,7 @@ def getAppleDSIDandSearchPartyToken(iCloudKey):
 
 def getOTPHeaders():
     AOSKitBundle = NSBundle.bundleWithPath_('/System/Library/PrivateFrameworks/AOSKit.framework')
-    objc.loadBundleFunctions(AOSKitBundle, globals(), [("retrieveOTPHeadersForDSID", '')])
+    objc.loadBundleFunctions(AOSKitBundle, globals(), [("retrieveOTPHeadersForDSID", b'')])
     util = NSClassFromString('AOSUtilities')
     anisette = str(util.retrieveOTPHeadersForDSID_("-2")).replace('"', ' ').replace(';', ' ').split()
     return anisette[6], anisette[3]
@@ -167,19 +167,17 @@ if __name__ == "__main__":
                 ids[hashed_adv] = priv
                 names[hashed_adv] = name
             else:
-                print "Couldn't find key pair in " + keyfile
+                print("Couldn't find key pair in", keyfile)
 
     startdate = unixEpoch - 60 * 60 * args.hours
-    data = '{"search": [{"endDate": %d, "startDate": %d, "ids": %s}]}' % ((unixEpoch -978307200) *1000000, (startdate -978307200)*1000000, ids.keys())
+    data = '{"search": [{"endDate": %d, "startDate": %d, "ids": %s}]}' % ((unixEpoch -978307200) *1000000, (startdate -978307200)*1000000, list(ids.keys()))
 
     # send out the whole thing
-    import httplib, urllib
-    conn = httplib.HTTPSConnection('gateway.icloud.com')
-    conn.request("POST", "/acsnservice/fetch", data, request_headers)
-    response = conn.getresponse()
-    print response.status, response.reason
-    res = json.loads(response.read())['results']
-    print '%d reports received.' % len(res)
+    import requests
+    response = requests.post('https://gateway.icloud.com/acsnservice/fetch', headers=request_headers, data=data)
+    print(response.status_code, response.reason)
+    res = response.json()['results']
+    print('%d reports received.' % len(res))
 
     ordered = []
     found = set()
@@ -206,8 +204,8 @@ if __name__ == "__main__":
             res['goog'] = 'https://maps.google.com/maps?q=' + str(res['lat']) + ',' + str(res['lon'])
             found.add(res['key'])
             ordered.append(res)
-    print '%d reports used.' % len(ordered)
+    print('%d reports used.' % len(ordered))
     ordered.sort(key=lambda item: item.get('timestamp'))
-    for rep in ordered: print rep
-    print 'found:   ', list(found)
-    print 'missing: ', [key for key in names.values() if key not in found]
+    for rep in ordered: print(rep)
+    print('found:   ', list(found))
+    print('missing: ', [key for key in names.values() if key not in found])
