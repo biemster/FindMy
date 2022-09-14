@@ -2,7 +2,6 @@
 import sys,base64,hashlib,random
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
-from p224 import scalar_mult,curve
 import argparse
 
 def int_to_bytes(n, length, endianess='big'):

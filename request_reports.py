@@ -57,12 +57,11 @@ def readKeychain():
             attr_offsets_b = kc[rec_start +24 : rec_start +24 +(rec_nattr *4)]
             attr_offsets = [bytes_to_int(attr_offsets_b[i:i+4]) +rec_start -1 for i in xrange(0, len(attr_offsets_b), 4)]
             if attr_offsets[0] and attr_offsets[0] < rec_start +bytes_to_int(kc[rec_start : rec_start +4]): # non-zero offset, and no weird big values
-                #print list(kc[attr_offsets[rec_attr] +4 : attr_offsets[rec_attr] +4 +bytes_to_int(kc[attr_offsets[rec_attr] : attr_offsets[rec_attr] +4])])
                 if kc[attr_offsets[rec_attr] +4 : attr_offsets[rec_attr] +4 +bytes_to_int(kc[attr_offsets[rec_attr] : attr_offsets[rec_attr] +4])] == attr_match:
                     return kc[rec_start +24 +(rec_nattr *4) : rec_start +24 +(rec_nattr *4) +bytes_to_int(kc[rec_start +16 : rec_start +20])] # return record blob data (NOTE not sure about BLOB size!!!)
             return None
 
-        if kc[:4] == 'kych':
+        if kc[:4] == b'kych':
             tbl_offsets = get_table_offsets(bytes_to_int(kc[12:16]))
             symmetric_key_idx = None
             for tbl_start in tbl_offsets[::-1]: # walk backwards so we get the generic password blob before the symmetric key, we need that to select which key to take
@@ -98,14 +97,14 @@ def retrieveICloudKey():
     password = getpass.getpass('Keychain password:')
     master_key = PBKDF2HMAC(algorithm=hashes.SHA1(), length=24, salt=db_key_salt, iterations=1000, backend=default_backend()).derive(bytes(password))
     db_key = unpad(decrypt(db_key_enc, algorithms.TripleDES(master_key), modes.CBC(db_key_IV)), algorithms.TripleDES.block_size)[:24]
-    p1 = unpad(decrypt(symmetric_key_enc, algorithms.TripleDES(db_key), modes.CBC('J\xdd\xa2,y\xe8!\x05')), algorithms.TripleDES.block_size)
+    p1 = unpad(decrypt(symmetric_key_enc, algorithms.TripleDES(db_key), modes.CBC(b'J\xdd\xa2,y\xe8!\x05')), algorithms.TripleDES.block_size)
     symmetric_key = unpad(decrypt(p1[:32][::-1], algorithms.TripleDES(db_key), modes.CBC(symmetric_key_IV)), algorithms.TripleDES.block_size)[4:]
     icloud_key = unpad(decrypt(icloud_key_enc, algorithms.TripleDES(symmetric_key), modes.CBC(icloud_key_IV)), algorithms.TripleDES.block_size)
     return icloud_key
 
 def getAppleDSIDandSearchPartyToken(iCloudKey):
     # copied from https://github.com/Hsn723/MMeTokenDecrypt
-    decryption_key = hmac.new("t9s\"lx^awe.580Gj%'ld+0LG<#9xa?>vb)-fkwb92[}", base64.b64decode(iCloudKey), digestmod=hashlib.md5).digest()
+    decryption_key = hmac.new(b't9s\"lx^awe.580Gj%\'ld+0LG<#9xa?>vb)-fkwb92[}', base64.b64decode(iCloudKey), digestmod=hashlib.md5).digest()
     mmeTokenFile = glob.glob("%s/Library/Application Support/iCloud/Accounts/[0-9]*" % os.path.expanduser("~"))[0]
     decryptedBinary = unpad(decrypt(open(mmeTokenFile, 'rb').read(), algorithms.AES(decryption_key), modes.CBC(b'\00' *16)), algorithms.AES.block_size);
     binToPlist = NSData.dataWithBytes_length_(decryptedBinary, len(decryptedBinary))
