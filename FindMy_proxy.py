@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 import os,glob
 import datetime, time
 import getpass
@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.backends import default_backend
 import objc; from Foundation import NSBundle, NSClassFromString, NSData, NSPropertyListSerialization
-import socketserver,httplib,urllib
+import socketserver,requests
 
 pwd = '' # Keychain password, can be hardcoded
 
@@ -39,17 +39,17 @@ def readKeychain():
         def get_table_offsets(tbl_array_offset):
             ntables = bytes_to_int(kc[tbl_array_offset +4 : tbl_array_offset +8])
             tbl_offsets_b = kc[tbl_array_offset +8 : tbl_array_offset +8 +(ntables *4)]
-            return [bytes_to_int(tbl_offsets_b[i:i+4]) +tbl_array_offset for i in xrange(0, len(tbl_offsets_b), 4)]
+            return [bytes_to_int(tbl_offsets_b[i:i+4]) +tbl_array_offset for i in range(0, len(tbl_offsets_b), 4)]
 
         def get_record_offsets(tbl_start):
             nrecords = bytes_to_int(kc[tbl_start +24 : tbl_start +28])
             rec_offsets_b = kc[tbl_start +28 : tbl_start +28 +(nrecords *4)]
-            rec_offsets = [bytes_to_int(rec_offsets_b[i:i+4]) +tbl_start for i in xrange(0, len(rec_offsets_b), 4)]
+            rec_offsets = [bytes_to_int(rec_offsets_b[i:i+4]) +tbl_start for i in range(0, len(rec_offsets_b), 4)]
             return [ro for ro in rec_offsets if ro != tbl_start and bytes_to_int(kc[ro : ro +4])] # remove 0 offset records and empty records
 
         def match_record_attribute(rec_start, rec_nattr, rec_attr, attr_match):
             attr_offsets_b = kc[rec_start +24 : rec_start +24 +(rec_nattr *4)]
-            attr_offsets = [bytes_to_int(attr_offsets_b[i:i+4]) +rec_start -1 for i in xrange(0, len(attr_offsets_b), 4)]
+            attr_offsets = [bytes_to_int(attr_offsets_b[i:i+4]) +rec_start -1 for i in range(0, len(attr_offsets_b), 4)]
             if attr_offsets[0] and attr_offsets[0] < rec_start +bytes_to_int(kc[rec_start : rec_start +4]): # non-zero offset, and no weird big values
                 if kc[attr_offsets[rec_attr] +4 : attr_offsets[rec_attr] +4 +bytes_to_int(kc[attr_offsets[rec_attr] : attr_offsets[rec_attr] +4])] == attr_match:
                     return kc[rec_start +24 +(rec_nattr *4) : rec_start +24 +(rec_nattr *4) +bytes_to_int(kc[rec_start +16 : rec_start +20])] # return record blob data (NOTE not sure about BLOB size!!!)
@@ -88,7 +88,7 @@ def readKeychain():
 
 def retrieveICloudKey():
     icloud_key_IV, icloud_key_enc, symmetric_key_IV, symmetric_key_enc, db_key_salt, db_key_IV, db_key_enc = readKeychain()
-    master_key = PBKDF2HMAC(algorithm=hashes.SHA1(), length=24, salt=db_key_salt, iterations=1000, backend=default_backend()).derive(bytes(pwd))
+    master_key = PBKDF2HMAC(algorithm=hashes.SHA1(), length=24, salt=db_key_salt, iterations=1000, backend=default_backend()).derive(bytes(pwd, encoding='ascii'))
     db_key = unpad(decrypt(db_key_enc, algorithms.TripleDES(master_key), modes.CBC(db_key_IV)), algorithms.TripleDES.block_size)[:24]
     p1 = unpad(decrypt(symmetric_key_enc, algorithms.TripleDES(db_key), modes.CBC(b'J\xdd\xa2,y\xe8!\x05')), algorithms.TripleDES.block_size)
     symmetric_key = unpad(decrypt(p1[:32][::-1], algorithms.TripleDES(db_key), modes.CBC(symmetric_key_IV)), algorithms.TripleDES.block_size)[4:]
@@ -138,11 +138,9 @@ class FindMy_proxy(socketserver.StreamRequestHandler):
             'X-BA-CLIENT-TIMESTAMP': "%s" % (unixEpoch)
         }
 
-        conn = httplib.HTTPSConnection('gateway.icloud.com')
-        conn.request("POST", "/acsnservice/fetch", data, request_headers)
-        res = conn.getresponse()
-        self.wfile.write(res.read())
-        print UTCTime, self.client_address[0], res.status, data
+        response = requests.post('https://gateway.icloud.com/acsnservice/fetch', headers=request_headers, data=data)
+        self.wfile.write(bytes(response.text, encoding='ascii'))
+        print(UTCTime, self.client_address[0], response.status_code, data)
 
 
 if __name__ == "__main__":
