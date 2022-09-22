@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import tempfile
 from FindMy_client import FindMyClient
 
 class MappingClient(FindMyClient):
@@ -18,8 +19,10 @@ class MappingClient(FindMyClient):
             dt = rep["isodatetime"].split('T')
             popup = folium.Popup(folium.IFrame(html=f'<h1>{rep["key"]}</h1> <h3>{dt[0]}</h3> <h3>{dt[1]}</h3>', width=150, height=150))
             osmap.add_child(folium.Marker(location=(rep['lat'],rep['lon']), popup=popup, icon=folium.Icon(color=iconcolors[list(self.found).index(rep['key'])])))
-        osmap.save('/tmp/tags.html')
-        webbrowser.open('file:///tmp/tags.html')
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.html') as fp:
+            fp.close()
+            osmap.save(fp.name)
+            webbrowser.open(f'file://{fp.name}')
 
 
 if __name__ == "__main__":
