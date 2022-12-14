@@ -1,5 +1,5 @@
 # FindMy firmware for Lenze st17h66
-The source for `FindMy.hex` is here:
+The source for `FindMy.hex` is here: https://github.com/biemster/st17h66_FindMy
 
 ## How to use:
 `PySerial` needs to be installed, then just simply type
