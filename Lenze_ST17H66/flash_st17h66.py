@@ -67,7 +67,7 @@ print(f'{bytes(c0[:10])} ... {bytes(c0[-10:])}, len {len(c0)} sum {sum(c0)}')
 print(f'{bytes(c0[-44:-42])} ... {bytes(c0[-28:-26])} ... {bytes(c0[-12:-10])}')
 print(f'{bytes(c1[:10])} ... {bytes(c1[-10:])}, len {len(c1)} sum {sum(c1)}')
 print(f'{bytes(c2[:10])} ... {bytes(c2[-10:])}, len {len(c2)} sum {sum(c2)}')
-print(f'key: {bytes(c1[-152:-124])}')
+print(f'key: {bytes(c1[-150:-122])}')
 
 
 import serial
@@ -108,11 +108,11 @@ for cmd in cmds:
         cfile = cmd[7] -48
         data = c[cfile]
 
-        if cfile == 1 and pubkey and data[-152:-124] == b'\x11"3DUfw\x88\x99\xaa\xbb\xcc\xdd\xef\xfe\xdd\xcc\xbb\xaa\x99\x88wfUD3"\x11':
+        if cfile == 1 and pubkey and data[-150:-122] == b'\x11"3DUfw\x88\x99\xaa\xbb\xcc\xdd\xef\xfe\xdd\xcc\xbb\xaa\x99\x88wfUD3"\x11':
             print('pubkey:', pubkey)
             key_bytes = base64.b64decode(pubkey)
             if len(key_bytes) == 28:
-                data[-152:-124] = key_bytes
+                data[-150:-122] = key_bytes
             else:
                 print('ERROR: wrong key length, using default key')
 
