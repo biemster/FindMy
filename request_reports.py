@@ -170,12 +170,20 @@ if __name__ == "__main__":
                 print "Couldn't find key pair in " + keyfile
 
     startdate = unixEpoch - 60 * 60 * args.hours
-    data = '{"search": [{"endDate": %d, "startDate": %d, "ids": %s}]}' % ((unixEpoch -978307200) *1000000, (startdate -978307200)*1000000, ids.keys())
+    data = {
+        "search": [
+            {
+                "startDate": startdate *1000,
+                "endDate": unixEpoch *1000,
+                "ids": list(ids.keys())
+            }
+        ]
+    }
 
     # send out the whole thing
     import httplib, urllib
     conn = httplib.HTTPSConnection('gateway.icloud.com')
-    conn.request("POST", "/acsnservice/fetch", data, request_headers)
+    conn.request("POST", "/acsnservice/fetch", json.dumps(data), request_headers)
     response = conn.getresponse()
     print response.status, response.reason
     res = json.loads(response.read())['results']

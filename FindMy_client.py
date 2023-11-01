@@ -56,13 +56,22 @@ if __name__ == "__main__":
                 names[hashed_adv] = name
             else:
                 print("Couldn't find key pair in", keyfile)
-
-    data = '{"search": [{%s"ids": %s}]}' % ('' if args.map else '"startDate": 0, ', list(ids.keys()))
+    unixEpoch = int(datetime.datetime.now().strftime('%s'))
+    startdate = unixEpoch - 60 * 60 * 24 * 7
+    data = {
+        "search": [
+            {
+                "startDate": startdate *1000,
+                "endDate": unixEpoch *1000,
+                "ids": list(ids.keys())
+            }
+        ]
+    }
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         sock.connect(('', 6176))
-        sock.sendall(bytes(data + '\n', encoding='ascii'))
+        sock.sendall(bytes(json.dumps(data) + '\n', encoding='ascii'))
         response = b''
         while True:
             rdata = sock.recv(1024)
