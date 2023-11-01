@@ -170,11 +170,19 @@ if __name__ == "__main__":
                 print("Couldn't find key pair in", keyfile)
 
     startdate = unixEpoch - 60 * 60 * args.hours
-    data = '{"search": [{"endDate": %d, "startDate": %d, "ids": %s}]}' % ((unixEpoch -978307200) *1000000, (startdate -978307200)*1000000, list(ids.keys()))
+    data = {
+        "search": [
+            {
+                "startDate": startdate *1000,
+                "endDate": unixEpoch *1000,
+                "ids": list(ids.keys())
+            }
+        ]
+    }
 
     # send out the whole thing
     import requests
-    response = requests.post('https://gateway.icloud.com/acsnservice/fetch', headers=request_headers, data=data)
+    response = requests.post('https://gateway.icloud.com/acsnservice/fetch', headers=request_headers, json=data)
     print(response.status_code, response.reason)
     res = response.json()['results']
     print('%d reports received.' % len(res))
