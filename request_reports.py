@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-import os,glob
-import datetime
-import argparse
+import os,glob,datetime,argparse
 import base64,json
-import hashlib
-import codecs,struct
+import hashlib,codecs,struct
 import requests
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -43,7 +40,8 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--prefix', help='only use keyfiles starting with this prefix', default='')
     args = parser.parse_args()
 
-    privkeys = names = {}
+    privkeys = {}
+    names = {}
     for keyfile in glob.glob(args.prefix+'*.keys'):
         # read key files generated with generate_keys.py
         with open(keyfile) as f:
