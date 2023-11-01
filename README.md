@@ -15,7 +15,7 @@ git clone https://github.com/Dadoum/anisette-v3-server
 2. Follow the installation instructions for `anisette-v3-server` and make sure it works
 3. Change `pypush/icloud/gsa.py` to use your local Anisette server:
 ```bash
-sed -i 's/ANISETTE = False/ANISETTE = http:/localhost:6969/' pypush/icloud/gsa.py`
+sed -i 's/ANISETTE = False/ANISETTE = http://localhost:6969/' pypush/icloud/gsa.py`
 ```
 4. (Optional, if you don't have a MAC and/or Apple ID): Generate an Apple ID, and install the Catalina Pre-installed docker image from https://github.com/sickcodes/Docker-OSX#run-catalina-pre-installed-, and login to iCloud using your AppleID.
 5. Retrieve your `search-party-token` using pypush:
