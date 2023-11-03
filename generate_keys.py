@@ -1,12 +1,13 @@
-#!/usr/bin/env python2
 import sys,base64,hashlib,random
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
 import argparse
+import binascii
+
 
 def int_to_bytes(n, length, endianess='big'):
     h = '%x' % n
-    s = ('0'*(len(h) % 2) + h).zfill(length*2).decode('hex')
+    s = binascii.hexlify(str(('0'*(len(h) % 2) + h).zfill(length*2)).encode('utf-8'))
     return s if endianess == 'big' else s[::-1]
 
 def sha256(data):
