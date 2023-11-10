@@ -6,6 +6,7 @@ import requests
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
+import sqlite3
 
 def sha256(data):
     digest = hashlib.new("sha256")
@@ -40,6 +41,9 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--prefix', help='only use keyfiles starting with this prefix', default='')
     args = parser.parse_args()
 
+    sq3db = sqlite3.connect('reports.db')
+    sq3 = sq3db.cursor()
+
     privkeys = {}
     names = {}
     for keyfile in glob.glob(args.prefix+'*.keys'):
@@ -73,6 +77,7 @@ if __name__ == "__main__":
 
         # the following is all copied from https://github.com/hatomist/openhaystack-python, thanks @hatomist!
         timestamp = int.from_bytes(data[0:4]) +978307200
+        sq3.execute(f"INSERT OR REPLACE INTO reports VALUES ('{names[report['id']]}', {timestamp}, {report['datePublished']}, '{report['payload']}', '{report['id']}', {report['statusCode']})")
         if timestamp >= startdate:
             eph_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP224R1(), data[5:62])
             shared_key = ec.derive_private_key(priv, ec.SECP224R1(), default_backend()).exchange(ec.ECDH(), eph_key)
@@ -83,15 +88,18 @@ if __name__ == "__main__":
             tag = data[72:]
 
             decrypted = decrypt(enc_data, algorithms.AES(decryption_key), modes.GCM(iv, tag))
-            res = decode_tag(decrypted)
-            res['timestamp'] = timestamp
-            res['isodatetime'] = datetime.datetime.fromtimestamp(timestamp).isoformat()
-            res['key'] = names[report['id']]
-            res['goog'] = 'https://maps.google.com/maps?q=' + str(res['lat']) + ',' + str(res['lon'])
-            found.add(res['key'])
-            ordered.append(res)
+            tag = decode_tag(decrypted)
+            tag['timestamp'] = timestamp
+            tag['isodatetime'] = datetime.datetime.fromtimestamp(timestamp).isoformat()
+            tag['key'] = names[report['id']]
+            tag['goog'] = 'https://maps.google.com/maps?q=' + str(tag['lat']) + ',' + str(tag['lon'])
+            found.add(tag['key'])
+            ordered.append(tag)
     print(f'{len(ordered)} reports used.')
     ordered.sort(key=lambda item: item.get('timestamp'))
     for rep in ordered: print(rep)
     print(f'found:   {list(found)}')
     print(f'missing: {[key for key in names.values() if key not in found]}')
+    sq3.close()
+    sq3db.commit()
+    sq3db.close()
