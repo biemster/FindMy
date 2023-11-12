@@ -17,8 +17,12 @@ git clone https://github.com/Dadoum/anisette-v3-server
 ```bash
 sed -i 's|ANISETTE = False|ANISETTE = http://localhost:6969|' pypush/icloud/gsa.py`
 ```
-4. (Optional, if you don't have a MAC and/or Apple ID): Generate an Apple ID, and install the Catalina Pre-installed docker image from https://github.com/sickcodes/Docker-OSX#run-catalina-pre-installed-, and login to iCloud using your AppleID.
-5. Retrieve your `search-party-token` using pypush:
+4. Create the database where the reports will be stored:
+```bash
+sqlite3 reports.db 'CREATE TABLE reports (id_short TEXT, timestamp INTEGER, datePublished INTEGER, payload TEXT, id TEXT, statusCode INTEGER, PRIMARY KEY(id_short,timestamp))'
+```
+5. (Optional, if you don't have a MAC and/or Apple ID): Generate an Apple ID, and install the Catalina Pre-installed docker image from https://github.com/sickcodes/Docker-OSX#run-catalina-pre-installed-, and login to iCloud using your AppleID.
+6. Retrieve your `search-party-token` using pypush:
 ```bash
 anisette-v3-server/anisette-v3-server & cd pypush ; python3 examples/openhaystack.py ; cd ..; killall anisette-v3-server
 ```
