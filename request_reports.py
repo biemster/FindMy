@@ -25,7 +25,7 @@ def decode_tag(data):
     return {'lat': latitude, 'lon': longitude, 'conf': confidence, 'status':status}
 
 def getAuth():
-    CONFIG_PATH = "../pypush/config/openhaystack.json"
+    CONFIG_PATH = os.path.dirname(os.path.realpath(__file__)) + "/../pypush/config/openhaystack.json"
     if os.path.exists(CONFIG_PATH):
         with open(CONFIG_PATH, "r") as f:
             j = json.load(f)
@@ -41,16 +41,16 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--prefix', help='only use keyfiles starting with this prefix', default='')
     args = parser.parse_args()
 
-    sq3db = sqlite3.connect('reports.db')
+    sq3db = sqlite3.connect(os.path.dirname(os.path.realpath(__file__)) + '/reports.db')
     sq3 = sq3db.cursor()
 
     privkeys = {}
     names = {}
-    for keyfile in glob.glob(args.prefix+'*.keys'):
+    for keyfile in glob.glob(os.path.dirname(os.path.realpath(__file__)) + '/' + args.prefix + '*.keys'):
         # read key files generated with generate_keys.py
         with open(keyfile) as f:
             hashed_adv = priv = ''
-            name = keyfile[len(args.prefix):-5]
+            name = os.path.basename(keyfile)[len(args.prefix):-5]
             for line in f:
                 key = line.rstrip('\n').split(': ')
                 if key[0] == 'Private key': priv = key[1]
