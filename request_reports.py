@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
 import sqlite3
+from pypush_gsa_icloud import icloud_login_mobileme, generate_anisette_headers
 
 def sha256(data):
     digest = hashlib.new("sha256")
@@ -24,21 +25,22 @@ def decode_tag(data):
     status = int.from_bytes(data[9:10])
     return {'lat': latitude, 'lon': longitude, 'conf': confidence, 'status':status}
 
-def getAuth():
-    CONFIG_PATH = os.path.dirname(os.path.realpath(__file__)) + "/../pypush/config/openhaystack.json"
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "r") as f:
-            j = json.load(f)
-            return (j['ds_prs_id'], j['search_party_token'])
+def getAuth(regenerate=False):
+    CONFIG_PATH = os.path.dirname(os.path.realpath(__file__)) + "/auth.json"
+    if os.path.exists(CONFIG_PATH) and not regenerate:
+        with open(CONFIG_PATH, "r") as f: j = json.load(f)
     else:
-        print(f'No search-party-token found, please run pypush/examples/openhaystack.py as described in the README')
-        exit(1)
+        mobileme = icloud_login_mobileme()
+        j = {'dsid': mobileme['dsid'], 'searchPartyToken': mobileme['delegates']['com.apple.mobileme']['service-data']['tokens']['searchPartyToken']}
+        with open(CONFIG_PATH, "w") as f: json.dump(j, f)
+    return (j['dsid'], j['searchPartyToken'])
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-H', '--hours', help='only show reports not older than these hours', type=int, default=24)
     parser.add_argument('-p', '--prefix', help='only use keyfiles starting with this prefix', default='')
+    parser.add_argument('-r', '--regen', help='regenerate search-party-token', action='store_true')
     args = parser.parse_args()
 
     sq3db = sqlite3.connect(os.path.dirname(os.path.realpath(__file__)) + '/reports.db')
@@ -65,7 +67,7 @@ if __name__ == "__main__":
     startdate = unixEpoch - (60 * 60 * args.hours)
     data = { "search": [{"startDate": startdate *1000, "endDate": unixEpoch *1000, "ids": list(names.keys())}] }
 
-    r = requests.post("https://gateway.icloud.com/acsnservice/fetch", auth=getAuth(), headers=json.loads(requests.get('http://localhost:6969').text), json=data)
+    r = requests.post("https://gateway.icloud.com/acsnservice/fetch", auth=getAuth(regenerate=args.regen), headers=generate_anisette_headers(), json=data)
     res = json.loads(r.content.decode())['results']
     print(f'{r.status_code}: {len(res)} reports received.')
 
