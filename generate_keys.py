@@ -1,13 +1,8 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 import sys,base64,hashlib,random
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
 import argparse
-
-def int_to_bytes(n, length, endianess='big'):
-    h = '%x' % n
-    s = ('0'*(len(h) % 2) + h).zfill(length*2).decode('hex')
-    return s if endianess == 'big' else s[::-1]
 
 def sha256(data):
     digest = hashlib.new("sha256")
@@ -30,8 +25,8 @@ for i in range(args.nkeys):
     priv = random.getrandbits(224)
     adv = ec.derive_private_key(priv, ec.SECP224R1(), default_backend()).public_key().public_numbers().x
 
-    priv_bytes = int_to_bytes(priv, 28)
-    adv_bytes = int_to_bytes(adv, 28)
+    priv_bytes = int.to_bytes(priv, 28)
+    adv_bytes = int.to_bytes(adv, 28)
 
     priv_b64 = base64.b64encode(priv_bytes).decode("ascii")
     adv_b64 = base64.b64encode(adv_bytes).decode("ascii")
