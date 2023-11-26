@@ -1,5 +1,5 @@
 # FindMy
-Query Apple's Find My network, based on all the hard work of https://github.com/seemoo-lab/openhaystack/ and @hatomist and @JJTech0130.
+Query Apple's Find My network, based on all the hard work of https://github.com/seemoo-lab/openhaystack/ and @hatomist and @JJTech0130 and @Dadoum.
 
 This is version 2, which does not require a Mac anymore thanks to the awesome work in https://github.com/JJTech0130/pypush.
 Version 1 that can be run on Macs can still be found in the catalina (python2) and monterey (python3) branches.
@@ -27,6 +27,13 @@ An nRF51 firmware can be found here: https://github.com/dakhnod/FakeTag
 ../anisette-v3-server/anisette-v3-server & ./request_reports.py ; killall anisette-v3-server
 ```
 in the same directory as your `.keys` files.
+
+Alternatively to step 3 you could install `https://github.com/Dadoum/pyprovision` (first install `anisette-v3-server` though to get a nice D environment and the required android libs),
+make a folder `anisette` in your working directory and just run
+```bash
+./request_reports.py
+```
+The script should pick up the python bindings to provision and use that instead.
 
 This current non-Mac workflow is not optimal yet, mainly because the anisette server is a bit of a workaround. A python solution for retrieving this is being
 developed in the pypush discord, please join there if you want to contribute!
