@@ -28,13 +28,13 @@ urllib3.disable_warnings()
 
 ANISETTE_URL = 'http://localhost:6969'  # https://github.com/Dadoum/anisette-v3-server
 
-def icloud_login_mobileme(username='', password=''):
+def icloud_login_mobileme(username='', password='', second_factor='sms'):
     if not username:
         username = input('Apple ID: ')
     if not password:
         password = getpass('Password: ')
 
-    g = gsa_authenticate(username, password)
+    g = gsa_authenticate(username, password, second_factor)
     pet = g["t"]["com.apple.gs.idms.pet"]["token"]
     adsid = g["adsid"]
 
@@ -63,7 +63,7 @@ def icloud_login_mobileme(username='', password=''):
 
     return plist.loads(r.content)
 
-def gsa_authenticate(username, password):
+def gsa_authenticate(username, password, second_factor='sms'):
     # Password is None as we'll provide it later
     usr = srp.User(username, bytes(), hash_alg=srp.SHA256, ng_type=srp.NG_2048)
     _, A = usr.start_authentication()
@@ -106,8 +106,10 @@ def gsa_authenticate(username, password):
         for k, v in spd.items():
             if isinstance(v, bytes):
                 spd[k] = base64.b64encode(v).decode()
-        #trusted_second_factor(spd["adsid"], spd["GsIdmsToken"])
-        sms_second_factor(spd["adsid"], spd["GsIdmsToken"])
+        if second_factor == 'sms':
+            sms_second_factor(spd["adsid"], spd["GsIdmsToken"])
+        elif second_factor == 'trusted_device':
+            trusted_second_factor(spd["adsid"], spd["GsIdmsToken"])
         return gsa_authenticate(username, password)
     elif "au" in r["Status"]:
         print(f"Unknown auth value {r['Status']['au']}")

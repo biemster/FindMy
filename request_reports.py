@@ -25,12 +25,12 @@ def decode_tag(data):
     status = int.from_bytes(data[9:10])
     return {'lat': latitude, 'lon': longitude, 'conf': confidence, 'status':status}
 
-def getAuth(regenerate=False):
+def getAuth(regenerate=False, second_factor='sms'):
     CONFIG_PATH = os.path.dirname(os.path.realpath(__file__)) + "/auth.json"
     if os.path.exists(CONFIG_PATH) and not regenerate:
         with open(CONFIG_PATH, "r") as f: j = json.load(f)
     else:
-        mobileme = icloud_login_mobileme()
+        mobileme = icloud_login_mobileme(second_factor=second_factor)
         j = {'dsid': mobileme['dsid'], 'searchPartyToken': mobileme['delegates']['com.apple.mobileme']['service-data']['tokens']['searchPartyToken']}
         with open(CONFIG_PATH, "w") as f: json.dump(j, f)
     return (j['dsid'], j['searchPartyToken'])
@@ -41,6 +41,7 @@ if __name__ == "__main__":
     parser.add_argument('-H', '--hours', help='only show reports not older than these hours', type=int, default=24)
     parser.add_argument('-p', '--prefix', help='only use keyfiles starting with this prefix', default='')
     parser.add_argument('-r', '--regen', help='regenerate search-party-token', action='store_true')
+    parser.add_argument('-t', '--trusteddevice', help='use trusted device for 2FA instead of SMS', action='store_true')
     args = parser.parse_args()
 
     sq3db = sqlite3.connect(os.path.dirname(os.path.realpath(__file__)) + '/reports.db')
@@ -67,7 +68,10 @@ if __name__ == "__main__":
     startdate = unixEpoch - (60 * 60 * args.hours)
     data = { "search": [{"startDate": startdate *1000, "endDate": unixEpoch *1000, "ids": list(names.keys())}] }
 
-    r = requests.post("https://gateway.icloud.com/acsnservice/fetch", auth=getAuth(regenerate=args.regen), headers=generate_anisette_headers(), json=data)
+    r = requests.post("https://gateway.icloud.com/acsnservice/fetch",
+            auth=getAuth(regenerate=args.regen, second_factor='trusted_device' if args.trusteddevice else 'sms'),
+            headers=generate_anisette_headers(),
+            json=data)
     res = json.loads(r.content.decode())['results']
     print(f'{r.status_code}: {len(res)} reports received.')
 
