@@ -153,8 +153,32 @@ def generate_cpd():
     return cpd
 
 def generate_anisette_headers():
-    h = json.loads(requests.get(ANISETTE_URL, timeout=5).text)
-    a = {"X-Apple-I-MD": h["X-Apple-I-MD"], "X-Apple-I-MD-M": h["X-Apple-I-MD-M"]}
+    try:
+        import pyprovision
+        from ctypes import c_ulonglong
+        import secrets
+        adi = pyprovision.ADI("./anisette/")
+        adi.provisioning_path = "./anisette/"
+        device = pyprovision.Device("./anisette/device.json")
+        if not device.initialized:
+            # Pretend to be a MacBook Pro
+            device.server_friendly_description = "<MacBookPro13,2> <macOS;13.1;22C65> <com.apple.AuthKit/1 (com.apple.dt.Xcode/3594.4.19)>"
+            device.unique_device_identifier = str(uuid.uuid4()).upper()
+            device.adi_identifier = secrets.token_hex(8).lower()
+            device.local_user_uuid = secrets.token_hex(32).upper()
+        adi.identifier = device.adi_identifier
+        dsid = c_ulonglong(-2).value
+        is_prov = adi.is_machine_provisioned(dsid)
+        if not is_prov:
+            print("provisioning...")
+            provisioning_session = pyprovision.ProvisioningSession(adi, device)
+            provisioning_session.provision(dsid)
+        otp = adi.request_otp(dsid)
+        a = {"X-Apple-I-MD": base64.b64encode(bytes(otp.one_time_password)).decode(), "X-Apple-I-MD-M": base64.b64encode(bytes(otp.machine_identifier)).decode()}
+    except ImportError:
+        print(f'pyprovision is not installed, querying {ANISETTE_URL} for an anisette server')
+        h = json.loads(requests.get(ANISETTE_URL, timeout=5).text)
+        a = {"X-Apple-I-MD": h["X-Apple-I-MD"], "X-Apple-I-MD-M": h["X-Apple-I-MD-M"]}
     a.update(generate_meta_headers(user_id=USER_ID, device_id=DEVICE_ID))
     return a
 
