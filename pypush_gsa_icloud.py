@@ -24,9 +24,11 @@ srp.no_username_in_x()
 
 # Disable SSL Warning
 import urllib3
+
 urllib3.disable_warnings()
 
 ANISETTE_URL = 'http://localhost:6969'  # https://github.com/Dadoum/anisette-v3-server
+
 
 def icloud_login_mobileme(username='', password='', second_factor='sms'):
     if not username:
@@ -40,7 +42,7 @@ def icloud_login_mobileme(username='', password='', second_factor='sms'):
 
     data = {
         "apple-id": username,
-        "delegates": {"com.apple.mobileme":{}},
+        "delegates": {"com.apple.mobileme": {}},
         "password": pet,
         "client-id": str(USER_ID),
     }
@@ -63,13 +65,16 @@ def icloud_login_mobileme(username='', password='', second_factor='sms'):
 
     return plist.loads(r.content)
 
+
 def gsa_authenticate(username, password, second_factor='sms'):
     # Password is None as we'll provide it later
     usr = srp.User(username, bytes(), hash_alg=srp.SHA256, ng_type=srp.NG_2048)
     _, A = usr.start_authentication()
 
     r = gsa_authenticated_request({"A2k": A, "ps": ["s2k", "s2k_fo"], "u": username, "o": "init"})
-
+    if "sp" not in r:
+        print("Authentication Failed. Check your Apple ID and password.")
+        raise Exception("AuthenticationError")
     if r["sp"] != "s2k":
         print(f"This implementation only supports s2k. Server returned {r['sp']}")
         return
@@ -100,7 +105,7 @@ def gsa_authenticate(username, password, second_factor='sms'):
 """
     spd = plist.loads(PLISTHEADER + spd)
 
-    if "au" in r["Status"] and r["Status"]["au"] in ["trustedDeviceSecondaryAuth","secondaryAuth"]:
+    if "au" in r["Status"] and r["Status"]["au"] in ["trustedDeviceSecondaryAuth", "secondaryAuth"]:
         print("2FA required, requesting code")
         # Replace bytes with strings
         for k, v in spd.items():
@@ -116,6 +121,7 @@ def gsa_authenticate(username, password, second_factor='sms'):
         return
     else:
         return spd
+
 
 def gsa_authenticated_request(parameters):
     body = {
@@ -141,6 +147,7 @@ def gsa_authenticated_request(parameters):
 
     return plist.loads(resp.content)["Response"]
 
+
 def generate_cpd():
     cpd = {
         # Many of these values are not strictly necessary, but may be tracked by Apple
@@ -153,6 +160,7 @@ def generate_cpd():
 
     cpd.update(generate_anisette_headers())
     return cpd
+
 
 def generate_anisette_headers():
     try:
@@ -176,13 +184,15 @@ def generate_anisette_headers():
             provisioning_session = pyprovision.ProvisioningSession(adi, device)
             provisioning_session.provision(dsid)
         otp = adi.request_otp(dsid)
-        a = {"X-Apple-I-MD": base64.b64encode(bytes(otp.one_time_password)).decode(), "X-Apple-I-MD-M": base64.b64encode(bytes(otp.machine_identifier)).decode()}
+        a = {"X-Apple-I-MD": base64.b64encode(bytes(otp.one_time_password)).decode(),
+             "X-Apple-I-MD-M": base64.b64encode(bytes(otp.machine_identifier)).decode()}
     except ImportError:
         print(f'pyprovision is not installed, querying {ANISETTE_URL} for an anisette server')
         h = json.loads(requests.get(ANISETTE_URL, timeout=5).text)
         a = {"X-Apple-I-MD": h["X-Apple-I-MD"], "X-Apple-I-MD-M": h["X-Apple-I-MD-M"]}
     a.update(generate_meta_headers(user_id=USER_ID, device_id=DEVICE_ID))
     return a
+
 
 def generate_meta_headers(serial="0", user_id=uuid.uuid4(), device_id=uuid.uuid4()):
     return {
@@ -196,15 +206,18 @@ def generate_meta_headers(serial="0", user_id=uuid.uuid4(), device_id=uuid.uuid4
         "X-Apple-I-SRL-NO": serial,  # Serial number
     }
 
+
 def encrypt_password(password, salt, iterations):
     p = hashlib.sha256(password.encode("utf-8")).digest()
     return pbkdf2.PBKDF2(p, salt, iterations, SHA256).read(32)
+
 
 def create_session_key(usr, name):
     k = usr.get_session_key()
     if k is None:
         raise Exception("No session key")
     return hmac.new(k, name.encode(), hashlib.sha256).digest()
+
 
 def decrypt_cbc(usr, data):
     extra_data_key = create_session_key(usr, "extra data key:")
@@ -219,6 +232,7 @@ def decrypt_cbc(usr, data):
     # Remove PKCS#7 padding
     padder = padding.PKCS7(128).unpadder()
     return padder.update(data) + padder.finalize()
+
 
 def trusted_second_factor(dsid, idms_token):
     identity_token = base64.b64encode((dsid + ":" + idms_token).encode()).decode()
@@ -281,7 +295,7 @@ def sms_second_factor(dsid, idms_token):
     headers.update(generate_anisette_headers())
 
     # TODO: Actually get the correct id, probably in the above GET
-    body = {"phoneNumber":{"id":1},"mode":"sms"}
+    body = {"phoneNumber": {"id": 1}, "mode": "sms"}
 
     # This will send the 2FA code to the user's phone over SMS
     # We don't care about the response, it's just some HTML with a form for entering the code

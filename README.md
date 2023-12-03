@@ -12,21 +12,31 @@ Only a free Apple ID is required, with SMS 2FA properly setup. If you don't have
 git clone https://github.com/biemster/FindMy
 git clone https://github.com/Dadoum/anisette-v3-server
 ```
-2. Follow the installation instructions for `anisette-v3-server` and make sure it works.
-3. Create the database where the reports will be stored:
-```bash
-sqlite3 reports.db 'CREATE TABLE reports (id_short TEXT, timestamp INTEGER, datePublished INTEGER, payload TEXT, id TEXT, statusCode INTEGER, PRIMARY KEY(id_short,timestamp))'
+2. Follow the installation instructions for `anisette-v3-server`. You may validate the server is running by, 
+``` commandline
+curl http://localhost:6969
+``` 
+
+3. Install the required python packages:
+```commandline
+pip3 install -r requirements.txt
 ```
+
 
 ## Run
 1. `cd` into the `FindMy` directory and generate keys using `./generate_keys.py`.
 2. Deploy your advertisement keys on devices supported by OpenHaystack. The ESP32 firmware is a mirror of the OpenHaystack binary, the Lenze 17H66 is found in many 1$ tags obtained from Ali.
 An nRF51 firmware can be found here: https://github.com/dakhnod/FakeTag
-3. run
+3. If the anisetter runs within a docker and it's up, then run :
+```bash
+./request_reports.py
+```
+
+
+Otherwise, in the same directory as your `.keys` files, run :
 ```bash
 ../anisette-v3-server/anisette-v3-server & ./request_reports.py ; killall anisette-v3-server
 ```
-in the same directory as your `.keys` files.
 
 Alternatively to step 3 you could install `https://github.com/Dadoum/pyprovision` (first install `anisette-v3-server` though to get a nice D environment and the required android libs),
 make a folder `anisette` in your working directory and just run
