@@ -58,7 +58,8 @@ if __name__ == "__main__":
         parser.add_argument('-H', '--hours', help='only show reports not older than these hours', type=int, default=24)
         parser.add_argument('-p', '--prefix', help='only use keyfiles starting with this prefix', default='')
         parser.add_argument('-r', '--regen', help='regenerate search-party-token', action='store_true')
-        parser.add_argument('-t', '--trusteddevice', help='use trusted device for 2FA instead of SMS', action='store_true')
+        parser.add_argument('-t', '--trusteddevice', help='use trusted device for 2FA instead of SMS',
+                            action='store_true')
         args = parser.parse_args()
 
         sq3db = sqlite3.connect(os.path.dirname(os.path.realpath(__file__)) + '/reports.db')
@@ -98,18 +99,20 @@ if __name__ == "__main__":
 
         ordered = []
         found = set()
+
+        # SQL query to create a table named 'report' if it does not exist
+        create_table_query = '''CREATE TABLE IF NOT EXISTS reports (
+        id_short TEXT, timestamp INTEGER, datePublished INTEGER, payload TEXT, 
+        id TEXT, statusCode INTEGER, lat TEXT, lon TEXT, conf INTEGER, PRIMARY KEY(id_short,timestamp));'''
+
+        # Execute the SQL query
+        sq3.execute(create_table_query)
+
         for report in res:
             priv = int.from_bytes(base64.b64decode(privkeys[report['id']]))
             data = base64.b64decode(report['payload'])
-
             # the following is all copied from https://github.com/hatomist/openhaystack-python, thanks @hatomist!
             timestamp = int.from_bytes(data[0:4]) + 978307200
-
-            # SQL Injection Mitigation
-            query = "INSERT OR REPLACE INTO reports VALUES (?, ?, ?, ?, ?, ?)"
-            parameters = (names[report['id']], timestamp, report['datePublished'], report['payload'], report['id'],
-                          report['statusCode'])
-            sq3.execute(query, parameters)
 
             if timestamp >= startdate:
                 eph_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP224R1(), data[5:62])
@@ -128,11 +131,19 @@ if __name__ == "__main__":
                 tag['goog'] = 'https://maps.google.com/maps?q=' + str(tag['lat']) + ',' + str(tag['lon'])
                 found.add(tag['key'])
                 ordered.append(tag)
+
+                # SQL Injection Mitigation
+                query = "INSERT OR REPLACE INTO reports VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                parameters = (names[report['id']], timestamp, report['datePublished'], report['payload'], report['id'],
+                              report['statusCode'], str(tag['lat']), str(tag['lon']), tag['conf'])
+                sq3.execute(query, parameters)
+
         print(f'{len(ordered)} reports used.')
         ordered.sort(key=lambda item: item.get('timestamp'))
         for rep in ordered: print(rep)
         print(f'found:   {list(found)}')
         print(f'missing: {[key for key in names.values() if key not in found]}')
+
         sq3.close()
         sq3db.commit()
         sq3db.close()
