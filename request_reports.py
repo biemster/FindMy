@@ -104,8 +104,13 @@ if __name__ == "__main__":
 
             # the following is all copied from https://github.com/hatomist/openhaystack-python, thanks @hatomist!
             timestamp = int.from_bytes(data[0:4]) + 978307200
-            sq3.execute(
-                f"INSERT OR REPLACE INTO reports VALUES ('{names[report['id']]}', {timestamp}, {report['datePublished']}, '{report['payload']}', '{report['id']}', {report['statusCode']})")
+
+            # SQL Injection Mitigation
+            query = "INSERT OR REPLACE INTO reports VALUES (?, ?, ?, ?, ?, ?)"
+            parameters = (names[report['id']], timestamp, report['datePublished'], report['payload'], report['id'],
+                          report['statusCode'])
+            sq3.execute(query, parameters)
+
             if timestamp >= startdate:
                 eph_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP224R1(), data[5:62])
                 shared_key = ec.derive_private_key(priv, ec.SECP224R1(), default_backend()).exchange(ec.ECDH(), eph_key)
