@@ -26,8 +26,8 @@ for i in range(args.nkeys):
     private_key = ec.generate_private_key(ec.SECP224R1(), default_backend())
     public_key = private_key.public_key()
 
-    private_key_bytes = private_key.private_numbers().private_value.to_bytes(28, byteorder='little')
-    public_key_bytes = public_key.public_numbers().x.to_bytes(28, byteorder='little')
+    private_key_bytes = private_key.private_numbers().private_value.to_bytes(28, byteorder='big')
+    public_key_bytes = public_key.public_numbers().x.to_bytes(28, byteorder='big')
 
     private_key_b64 = base64.b64encode(private_key_bytes).decode("ascii")
     public_key_b64 = base64.b64encode(public_key_bytes).decode("ascii")
