@@ -66,9 +66,18 @@ async def handle_form(
             if len(key)>0:
                 advertisement_keys_list.append(key)
 
+    # Error handling
     if len(advertisement_keys_invalid_list) > 0:
         return JSONResponse(
             content={"error": f"Invalid Hashed Advertisement Base64 Key(s): {advertisement_keys_invalid_list}"},
+            status_code=400)
+    if len(advertisement_keys_list) == 0:
+        return JSONResponse(
+            content={"error": f"No valid Hashed Advertisement Base64 Key(s) found"},
+            status_code=400)
+    if len(advertisement_keys_list) > 96:
+        return JSONResponse(
+            content={"error": f"Too many Hashed Advertisement Base64 Key(s) found, Apple limits to 96"},
             status_code=400)
 
     unix_epoch = int(datetime.datetime.now().strftime('%s'))
