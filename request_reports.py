@@ -109,7 +109,7 @@ if __name__ == "__main__":
         sq3.execute(create_table_query)
 
         for report in res:
-            priv = int.from_bytes(base64.b64decode(privkeys[report['id']]))
+            priv = int.from_bytes(base64.b64decode(privkeys[report['id']]), byteorder='big')
             data = base64.b64decode(report['payload'])
             # the following is all copied from https://github.com/hatomist/openhaystack-python, thanks @hatomist!
             timestamp = int.from_bytes(data[0:4]) + 978307200
