@@ -10,7 +10,14 @@ from fastapi.params import Query
 from fastapi.responses import JSONResponse
 from pypush_gsa_icloud import icloud_login_mobileme, generate_anisette_headers
 
-app = FastAPI()
+app = FastAPI(
+    title="FindMy Gateway API",
+    summary="Query Apple's Find My network, allowing none Apple devices to retrieve the location reports.",
+    description="### Important Concepts:  "
+                "\n**Private Key:** Generated on your device as a secret, used for decrypting the report.  "
+                "\n**Public Key / Advertisement Key:** Derive from the private key, used for broadcasting.  "
+                "\n**Hashed Advertisement Key:** SHA256 hashed public key, used for querying reports.  "
+)
 
 CONFIG_PATH = os.path.dirname(os.path.realpath(__file__)) + "/auth.json"
 if os.path.exists(CONFIG_PATH):
@@ -28,12 +35,10 @@ dsid = j['dsid']
 searchPartyToken = j['searchPartyToken']
 
 
-@app.get("/SingleDeviceEncryptedReports/")
-async def handle_form(
+@app.get("/SingleDeviceEncryptedReports/",summary="Retrieve reports for one device at a time.")
+async def single_device_encrypted_reports(
         advertisement_key: str = Query(
-            description="Paste your Hashed Advertisement Base64 Key here. Please be aware this is NOT the Private Key, "
-                        "nor Public Key! The Hashed Advertisement Key is a Base64 encoded string, that used SHA256 to "
-                        "hash the Advertisement/Public Key.This API process one device at a time.",
+            description="Hashed Advertisement Base64 Key.",
             min_length=44, max_length=44, regex=r"^[-A-Za-z0-9+/]*={0,3}$"),
         hours: int = Query(1, description="Hours to search back in time", ge=1, le=24)):
     unix_epoch = int(datetime.datetime.now().strftime('%s'))
@@ -48,12 +53,11 @@ async def handle_form(
     return json.loads(r.content.decode(encoding='utf-8'))
 
 
-@app.get("/MutipleDeviceEncryptedReports/")
-async def handle_form(
+@app.get("/MutipleDeviceEncryptedReports/",summary="Retrieve reports for multiple devices at a time.")
+async def mutiple_device_encrypted_reports(
         advertisement_keys: str = Query(
-            description="Paste your Hashed Advertisement Base64 Key here. Please be aware this is NOT the Private Key, "
-                        "nor Public Key! The Hashed Advertisement Key is a Base64 encoded string, that used SHA256 to "
-                        "hash the Advertisement/Public Key. Sperate each key by a comma.",
+            description="Hashed Advertisement Base64 Key. "
+                        "Separate each key by a comma.",
         ),
         hours: int = Query(1, description="Hours to search back in time", ge=1, le=24)):
     re_exp = r"^[-A-Za-z0-9+/]*={0,3}$"
