@@ -121,9 +121,9 @@ if __name__ == "__main__":
                 decryption_key = symmetric_key[:16]
                 iv = symmetric_key[16:]
                 enc_data = data[62:72]
-                tag = data[72:]
+                auth_tag = data[72:]
 
-                decrypted = decrypt(enc_data, algorithms.AES(decryption_key), modes.GCM(iv, tag))
+                decrypted = decrypt(enc_data, algorithms.AES(decryption_key), modes.GCM(iv, auth_tag))
                 tag = decode_tag(decrypted)
                 tag['timestamp'] = timestamp
                 tag['isodatetime'] = datetime.datetime.fromtimestamp(timestamp).isoformat()
