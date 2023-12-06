@@ -173,7 +173,9 @@ async def report_decryption(
                         "use at your own risk!**  "
                         "\nBase64 format, separate each key by a comma.  ", min_length=40, max_length=8192,
         ),
-        reports: UploadFile = File(..., max_size=5 * 1024 * 1024),
+        reports: UploadFile = File(..., max_size=5 * 1024 * 1024,
+                                   description="The JSON response from MultipleDeviceEncryptedReports or "
+                                               "SingleDeviceEncryptedReports"),
         skip_invalid: bool = Query(description="Ignore report and private mismatch", default=False)):
     valid_private_keys = set()
     invalid_private_keys = set()
