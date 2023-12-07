@@ -8,7 +8,7 @@ from typing import Annotated
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from fastapi import FastAPI, UploadFile, Header
+from fastapi import FastAPI, UploadFile, Header, Body
 
 import requests
 from fastapi.params import Query, File
@@ -78,7 +78,7 @@ def decrypt_payload(report: str, private_key: str) -> {}:
     data = base64.b64decode(report)
     priv = int.from_bytes(base64.b64decode(private_key), byteorder="big")
 
-    timestamp = int.from_bytes(data[0:4],byteorder="big") + 978307200
+    timestamp = int.from_bytes(data[0:4], byteorder="big") + 978307200
     eph_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP224R1(), data[5:62])
     shared_key = ec.derive_private_key(priv, ec.SECP224R1(), default_backend()).exchange(ec.ECDH(), eph_key)
     symmetric_key = sha256(shared_key + b'\x00\x00\x00\x01' + data[5:62])
@@ -126,20 +126,22 @@ async def single_device_encrypted_reports(
 
 @app.post("/MultipleDeviceEncryptedReports/", summary="Retrieve reports for multiple devices at a time.")
 async def multiple_device_encrypted_reports(
-        advertisement_keys: str = Query(
-            description="Hashed Advertisement Base64 Key. "
-                        "Separate each key by a comma.", min_length=44, max_length=8192,
-        ),
+        advertisement_keys: Annotated[str, Body(
+            description="Hashed Advertisement Base64 Key. Separate each key by a comma.",
+            media_type="text/plain")],
+
         hours: int = Query(1, description="Hours to search back in time", ge=1, le=24)):
     re_exp = r"^[-A-Za-z0-9+/]*={0,3}$"
-    advertisement_keys_list = set()
+    advertisement_keys_list = []
     advertisement_keys_invalid_list = set()
+
     for key in advertisement_keys.strip().replace(" ", "").split(','):
         if len(key) != 44 or not re.match(re_exp, key):
-            advertisement_keys_invalid_list.add(key)
+            if key != "":
+                advertisement_keys_invalid_list.add(key)
         else:
             if len(key) > 0:
-                advertisement_keys_list.add(key)
+                advertisement_keys_list.append(key)
 
     # Error handling
     if len(advertisement_keys_invalid_list) > 0:
@@ -149,10 +151,6 @@ async def multiple_device_encrypted_reports(
     if len(advertisement_keys_list) == 0:
         return JSONResponse(
             content={"error": f"No valid Hashed Advertisement Base64 Key(s) found"},
-            status_code=400)
-    if len(advertisement_keys_list) > 96:
-        return JSONResponse(
-            content={"error": f"Too many Hashed Advertisement Base64 Key(s) found, Apple limits to 96"},
             status_code=400)
 
     unix_epoch = int(datetime.datetime.now().strftime('%s'))
