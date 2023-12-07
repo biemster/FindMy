@@ -78,7 +78,7 @@ def decrypt_payload(report: str, private_key: str) -> {}:
     data = base64.b64decode(report)
     priv = int.from_bytes(base64.b64decode(private_key), byteorder="big")
 
-    timestamp = int.from_bytes(data[0:4]) + 978307200
+    timestamp = int.from_bytes(data[0:4],byteorder="big") + 978307200
     eph_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP224R1(), data[5:62])
     shared_key = ec.derive_private_key(priv, ec.SECP224R1(), default_backend()).exchange(ec.ECDH(), eph_key)
     symmetric_key = sha256(shared_key + b'\x00\x00\x00\x01' + data[5:62])
@@ -92,8 +92,8 @@ def decrypt_payload(report: str, private_key: str) -> {}:
     result = {}
     latitude = struct.unpack(">i", clear_text[0:4])[0] / 10000000.0
     longitude = struct.unpack(">i", clear_text[4:8])[0] / 10000000.0
-    confidence = int.from_bytes(clear_text[8:9])
-    status = int.from_bytes(clear_text[9:10])
+    confidence = int.from_bytes(clear_text[8:9], byteorder="big")
+    status = int.from_bytes(clear_text[9:10], byteorder="big")
 
     result['timestamp'] = timestamp
     result['isodatetime'] = datetime.datetime.fromtimestamp(timestamp).isoformat()
@@ -211,11 +211,11 @@ async def report_decryption(
         for report in reports:
             logging.debug(f"Processing {report}")
             if report['id'] in valid_reports:
-                valid_reports[report['id']].add(report)
+                valid_reports[report['id']].append(report)
             else:
                 logging.debug(f"ID is not in dict, creating list and adding ...")
-                valid_reports[report['id']] = set()
-                valid_reports[report['id']].add(report)
+                valid_reports[report['id']] = []
+                valid_reports[report['id']].append(report)
 
     except Exception as e:
         logging.error(f"JSON Decode Failed: {e}", exc_info=True)
