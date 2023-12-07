@@ -4,10 +4,11 @@ import json
 import os
 import re
 import struct
+from typing import Annotated
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, UploadFile, Header
 
 import requests
 from fastapi.params import Query, File
@@ -168,11 +169,8 @@ async def multiple_device_encrypted_reports(
 
 @app.post("/Decryption/", summary="Decrypt reports for one or many devices.")
 async def report_decryption(
-        private_keys: str = Query(
-            description="**PRIVACY WARNING: Private key is a secret and shall not be sent to any untrusted website, "
-                        "use at your own risk!**  "
-                        "\nBase64 format, separate each key by a comma.  ", min_length=40, max_length=8192,
-        ),
+        private_keys: Annotated[str | None, Header(
+            description="**Private Key is a secret and shall not be provided to any untrusted website!**")] = None,
         reports: UploadFile = File(..., max_size=5 * 1024 * 1024,
                                    description="The JSON response from MultipleDeviceEncryptedReports or "
                                                "SingleDeviceEncryptedReports"),
