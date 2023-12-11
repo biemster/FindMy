@@ -25,8 +25,8 @@ for i in range(args.nkeys):
     priv = random.getrandbits(224)
     adv = ec.derive_private_key(priv, ec.SECP224R1(), default_backend()).public_key().public_numbers().x
 
-    priv_bytes = int.to_bytes(priv, 28)
-    adv_bytes = int.to_bytes(adv, 28)
+    priv_bytes = int.to_bytes(priv, 28, 'big')
+    adv_bytes = int.to_bytes(adv, 28, 'big')
 
     priv_b64 = base64.b64encode(priv_bytes).decode("ascii")
     adv_b64 = base64.b64encode(adv_bytes).decode("ascii")

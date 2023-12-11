@@ -21,8 +21,8 @@ def decrypt(enc_data, algorithm_dkey, mode):
 def decode_tag(data):
     latitude = struct.unpack(">i", data[0:4])[0] / 10000000.0
     longitude = struct.unpack(">i", data[4:8])[0] / 10000000.0
-    confidence = int.from_bytes(data[8:9])
-    status = int.from_bytes(data[9:10])
+    confidence = int.from_bytes(data[8:9], 'big')
+    status = int.from_bytes(data[9:10], 'big')
     return {'lat': latitude, 'lon': longitude, 'conf': confidence, 'status':status}
 
 def getAuth(regenerate=False, second_factor='sms'):
@@ -78,11 +78,11 @@ if __name__ == "__main__":
     ordered = []
     found = set()
     for report in res:
-        priv = int.from_bytes(base64.b64decode(privkeys[report['id']]))
+        priv = int.from_bytes(base64.b64decode(privkeys[report['id']]), 'big')
         data = base64.b64decode(report['payload'])
 
         # the following is all copied from https://github.com/hatomist/openhaystack-python, thanks @hatomist!
-        timestamp = int.from_bytes(data[0:4]) +978307200
+        timestamp = int.from_bytes(data[0:4], 'big') +978307200
         sq3.execute(f"INSERT OR REPLACE INTO reports VALUES ('{names[report['id']]}', {timestamp}, {report['datePublished']}, '{report['payload']}', '{report['id']}', {report['statusCode']})")
         if timestamp >= startdate:
             eph_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP224R1(), data[5:62])
