@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import datetime
 import hashlib
 import json
@@ -18,6 +19,8 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 import base64
 import logging
+import uvicorn
+
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -240,3 +243,6 @@ async def report_decryption(
             status_code=400)
 
     return valid_reports
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info")
