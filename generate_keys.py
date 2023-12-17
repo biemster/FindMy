@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import base64,argparse
+import os
+
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -14,6 +16,9 @@ args = parser.parse_args()
 if args.yaml:
     yaml = open(args.yaml + '.yaml', 'w')
     yaml.write('  keys:\n')
+
+if not os.path.exists('keys'):
+    os.makedirs('keys')
 
 for i in range(args.nkeys):
     while True:
@@ -44,7 +49,9 @@ for i in range(args.nkeys):
             else:
                 fname = '%s.keys' % s256_b64[:7]
 
-            with open(fname, 'w') as f:
+            #mkdir keys
+
+            with open(f"keys/{fname}", 'w') as f:
                 f.write('Private key: %s\n' % private_key_b64)
                 f.write('Advertisement key: %s\n' % public_key_b64)
                 f.write('Hashed adv key: %s\n' % s256_b64)
