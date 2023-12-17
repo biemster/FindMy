@@ -12,7 +12,7 @@ This project based on all the hard work of, and is a combination of the followin
 
 ### generate_keys.py
 Use the `generate_keys.py` script to generate the required keys. The script will generate a `.keys`
-or mutiple files for each device you want to use. Each `.keys` file will contain the private key, the public key
+or multiple files for each device you want to use. Each `.keys` file will contain the private key, the public key
 (also called advertisement key) and the hashed advertisement key. As the name suggests, the private key is a secret
 and should not be shared. The public key (advertisement key) is used for broadcasting the BLE message, this is also
 being asked by the `hci.py` script in openhaystack project. The hashed advertisement key is for requesting location
@@ -20,7 +20,7 @@ reports from Apple.
 
 ### request_reports.py
 Use the `request_reports.py` script to request location reports from Apple. The script will read the `.keys` files and
-request location reports for each device. The script will also attempt to log in and provided Apple acount and save
+request location reports for each device. The script will also attempt to log in and provided Apple account and save
 the session cookies in `auth.json` file. The reports are stored in the `reports` database.
 
 ### web_service.py
@@ -28,7 +28,7 @@ Use the `web_service.py` script to start a web service that will serve the locat
 
 ### anisette-v3-server
 
-Q: What does this external project do? The SMS code is only asked once, where and how is the information stored?
+Q: What does this external project do? The SMS code is only asked once, in where and how is the information stored?
 
 A: Anisette is similar to a device fingerprint. It is intended to be stored on an Apple device once it becomes trusted. 
 Subsequent requests made by this "device" using this fingerprint and same Apple account will not trigger the 2FA again. 
@@ -84,15 +84,23 @@ Follow the installation instructions for [anisette-v3-server](https://github.com
 
 ## Run 
 You may run this project as a local service, a web service, or both. 
+
+### Key generation
+```bash
+./generate_keys.py # Without any arguments, it will generate a single key file and save under current directory.
+```
+
+Deploy your advertisement keys on devices supported by OpenHaystack. The ESP32 firmware is a mirror of the 
+OpenHaystack binary, the Lenze 17H66 is found in many 1$ tags obtained from Ali. 
+An nRF51 firmware can be found here: https://github.com/dakhnod/FakeTag
+
 ### as a local service and write to database
 
-1. `cd` into the `findmy` directory and generate keys using `./generate_keys.py`.
-2. Deploy your advertisement keys on devices supported by OpenHaystack. The ESP32 firmware is a mirror of the
-   OpenHaystack binary, the Lenze 17H66 is found in many 1$ tags obtained from Ali. An nRF51 firmware can be found here: https://github.com/dakhnod/FakeTag
-3. The anisetter docker service shall run on the same device of this project. If the anisetter has started, then run :
+The anisetter docker service shall run on the same device of this project. 
+If the anisetter has started, then run:
 
 ```bash
-./request_reports.py
+./request_reports.py # Without any arguments, it will read all the .keys files under current directory.
 ```
 
 ### as a web service
