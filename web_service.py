@@ -362,19 +362,20 @@ async def publish_mqtt():
     then and publish it to the MQTT server which previously declared and saved in the database.
     """
     import paho.mqtt.publish as publish
-
+    import certifi
+    ca_path = certifi.where()
     # hash_adv_key TEXT, private_key TEXT, friendly_name TEXT, mqtt_server TEXT, mqtt_port INTEGER, mqtt_over_tls BOOLEAN,
     # mqtt_publish_encryption_key TEXT, mqtt_username TEXT, mqtt_userpass TEXT, mqtt_topic TEXT
 
     sync_latest_decrypted_reports()
 
     tags = _sq3.execute(
-        "SELECT hash_adv_key, friendly_name, mqtt_server, mqtt_port, lat, lon, timestamp, mqtt_over_tls,"
-        "mqtt_publish_encryption_key, mqtt_username, mqtt_userpass, mqtt_topic "
+        "SELECT hash_adv_key, friendly_name, mqtt_server, mqtt_port, lat, lon, max(timestamp), mqtt_over_tls,"
+        "mqtt_publish_encryption_key, mqtt_username, mqtt_userpass, mqtt_topic, max(conf) "
         "FROM tags, reports "
         "WHERE reports.id = tags.hash_adv_key AND lat IS NOT NULL AND lon IS NOT NULL "
         "GROUP BY hash_adv_key, mqtt_server "
-        "ORDER BY timestamp;").fetchall()
+        "ORDER BY timestamp ;").fetchall()
 
     logging.debug(f"tags to send. {tags}")
     try:
@@ -402,9 +403,8 @@ async def publish_mqtt():
                       }
 
             if tag[7]:
-                import certifi
                 logging.info(f"Publishing MQTT for {tag[0]} to {tag[2]}")
-                ca_path = certifi.where()
+
                 publish.single(
                     topic=f"owntracks/{tag[9]}/{tag[0]}",  # owntracks/<username>/<device_id>
                     payload=json.dumps(report, separators=(',', ':')),
@@ -424,7 +424,7 @@ async def publish_mqtt():
                     transport="tcp")
 
         return JSONResponse(
-            content={"success": f"Publish MQTT"},
+            content={"success": f"Published MQTT"},
             status_code=200)
     except Exception as e:
         logging.error(f"Publish MQTT Failed: {e}", exc_info=True)
