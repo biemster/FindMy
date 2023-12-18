@@ -307,6 +307,21 @@ async def key_to_monitor(
     **Private Key and UserPass are secrets, you shall not provide them to any untrusted website!**<br>
 
     When this api is triggered, it will save the private key and MQTT credentials to the database.
+
+    Example,\n
+    ```JSON
+    {
+      "private_key": "TAG PRIVATE KEY",
+      "friendly_name": "OwnTags",
+      "mqtt_server": "xxx.com or 222.111.0.123",
+      "mqtt_port": 8883,
+      "mqtt_topic": "Does Not Work at this moment. Leave it empty if you don't want to specify the topic.",
+      "mqtt_publish_encryption_key": "Does Not Work at this moment. Leave it empty if you don't want to encrypt the payload",
+      "mqtt_username": "USERNAME",
+      "mqtt_userpass": "PASSWORD",
+      "mqtt_over_tls": true or false
+    }
+    ```
     """
     valid_private_keys, invalid_private_keys = private_key_from_json(private_key)
 
@@ -342,8 +357,6 @@ def sync_latest_decrypted_reports():
         return
 
     reports = get_report_from_upstream(",".join(hash_adv_keys), 1)
-
-
 
     if "results" in reports:
         for report in reports["results"]:
@@ -426,12 +439,12 @@ async def publish_mqtt():
                       "timestamp": tag[6],
                       "tag": tag[1]
                       }
+            escape_keyname = tag[0].replace("/", "_")
 
             if tag[7]:
                 logging.info(f"Publishing MQTT for {tag[0]} to {tag[2]}")
-
                 publish.single(
-                    topic=f"owntracks/{tag[9]}/{tag[0]}",  # owntracks/<username>/<device_id>
+                    topic=f"owntracks/{tag[9]}/{tag[1]}_{escape_keyname[:4]}",
                     payload=json.dumps(report, separators=(',', ':')),
                     qos=1, retain=True, hostname=tag[2], client_id=tag[9],
                     port=int(tag[3]), keepalive=60, will=None, tls={"ca_certs": ca_path},
@@ -441,7 +454,7 @@ async def publish_mqtt():
             else:
                 logging.info(f"Publishing MQTT for {tag[0]} to {tag[2]}")
                 publish.single(
-                    topic=f"owntracks/{tag[9]}/{tag[0]}",  # owntracks/<username>/<device_id>
+                    topic=f"owntracks/{tag[9]}/{tag[1]}_{escape_keyname[:4]}",
                     payload=json.dumps(report, separators=(',', ':')),
                     qos=1, retain=True, hostname=tag[2], client_id=tag[9],
                     port=int(tag[3]), keepalive=60, will=None, tls=None,
@@ -453,10 +466,33 @@ async def publish_mqtt():
             status_code=200)
     except Exception as e:
         logging.error(f"Publish MQTT Failed: {e}", exc_info=True)
+        pass
+
+
+@app.post("/Tag_Removal/", summary="Remove everything from Database with given hashed, advertisement, or private key.")
+async def tag_removal(
+        keys: Annotated[str, Query(
+            description="Key in Base64 format. Separate each key by a comma.")]):
+    re_exp = r"^[-A-Za-z0-9+/]*={0,3}$"
+
+    keys_set = set()
+    for key in keys.strip().replace(" ", "").split(','):
+        if len(key) > 0 and re.match(re_exp, key):
+            keys_set.add(key)
+
+    if len(keys_set) == 0:
         return JSONResponse(
-            content={"error": f"Publish MQTT Failed"},
+            content={"error": f"No valid Base64 Key(s) found"},
             status_code=400)
 
+    for key in keys_set:
+        _sq3.execute("DELETE FROM tags WHERE hash_adv_key = ? OR private_key = ?", (key, key))
+        _sq3.execute("DELETE FROM reports WHERE id = ?", (key,))
+
+    sq3db.commit()
+    return JSONResponse(
+        content={"success": f"Key(s) removed from database"},
+        status_code=200)
 
 if __name__ == "__main__":
     uvicorn.run("web_service:app", host="127.0.0.1", port=8000, log_level="info")
