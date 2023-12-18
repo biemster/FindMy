@@ -161,7 +161,6 @@ def get_report_from_upstream(advertisement_keys: str, hours: int) -> {}:
             if len(key) > 0:
                 advertisement_keys_list.append(key)
 
-    # Error handling
     if len(advertisement_keys_invalid_list) > 0:
         return JSONResponse(
             content={"error": f"Invalid Hashed Advertisement Base64 Key(s): {advertisement_keys_invalid_list}"},
@@ -336,11 +335,15 @@ async def key_to_monitor(
 def sync_latest_decrypted_reports():
     hash_adv_keys = _sq3.execute("SELECT hash_adv_key FROM tags")
     hash_adv_keys = set([item[0] for item in hash_adv_keys])
+
+    logging.debug(f"hash_adv_keys: {hash_adv_keys}")
+    if len(hash_adv_keys) == 0:
+        logging.error(f"No Report available, or Upstream informed an error.", exc_info=True)
+        return
+
     reports = get_report_from_upstream(",".join(hash_adv_keys), 1)
 
-    if len(reports) == 0:
-        logging.error(f"No Report available, or Upstream informed an error. {reports['statusCode']}", exc_info=True)
-        return
+
 
     if "results" in reports:
         for report in reports["results"]:
@@ -398,7 +401,7 @@ async def publish_mqtt():
 
     if len(tags) == 0:
         return JSONResponse(
-            content={"error": f"No valid reports found"},
+            content={"error": f"No valid report found"},
             status_code=400)
     try:
         for tag in tags:
