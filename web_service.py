@@ -337,6 +337,11 @@ def sync_latest_decrypted_reports():
     hash_adv_keys = _sq3.execute("SELECT hash_adv_key FROM tags")
     hash_adv_keys = set([item[0] for item in hash_adv_keys])
     reports = get_report_from_upstream(",".join(hash_adv_keys), 1)
+
+    if len(reports) == 0:
+        logging.error(f"No Report available, or Upstream informed an error. {reports['statusCode']}", exc_info=True)
+        return
+
     if "results" in reports:
         for report in reports["results"]:
             if report["id"] in hash_adv_keys:
