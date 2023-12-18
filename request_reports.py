@@ -14,7 +14,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from pypush_gsa_icloud import icloud_login_mobileme, generate_anisette_headers
+from cores.pypush_gsa_icloud import icloud_login_mobileme, generate_anisette_headers
 
 
 def sha256(data):

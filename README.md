@@ -7,6 +7,7 @@ This project based on all the hard work of, and is a combination of the followin
 1. https://github.com/seemoo-lab/openhaystack/
 2. https://github.com/biemster/FindMy
 3. https://github.com/Dadoum/anisette-v3-server
+4. https://github.com/mrmay-dev/owntags
 
 ## Schematic and Usage
 

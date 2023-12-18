@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import sqlite3
 import struct
 from typing import Annotated
 
@@ -14,13 +15,12 @@ from fastapi import FastAPI, UploadFile, Header, Body
 import requests
 from fastapi.params import Query, File
 from fastapi.responses import JSONResponse
-from pypush_gsa_icloud import icloud_login_mobileme, generate_anisette_headers
+from cores.pypush_gsa_icloud import icloud_login_mobileme, generate_anisette_headers
 from cryptography.hazmat.primitives.asymmetric import ec
 
 import base64
 import logging
 import uvicorn
-
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -33,7 +33,7 @@ app = FastAPI(
                 "\n**Hashed Advertisement Key:** SHA256 hashed public key, used for querying reports.  "
 )
 
-CONFIG_PATH = os.path.dirname(os.path.realpath(__file__)) + "/auth.json"
+CONFIG_PATH = os.path.dirname(os.path.realpath(__file__)) + "/keys/auth.json"
 if os.path.exists(CONFIG_PATH):
     with open(CONFIG_PATH, "r") as f:
         j = json.load(f)
@@ -47,6 +47,41 @@ else:
 
 dsid = j['dsid']
 searchPartyToken = j['searchPartyToken']
+
+sq3db = sqlite3.connect(os.path.dirname(os.path.realpath(__file__)) + '/keys/reports.db')
+_sq3 = sq3db.cursor()
+
+# SQL query to create a table named 'report' if it does not exist
+create_table_query = '''CREATE TABLE IF NOT EXISTS tags (
+        hash_adv_key TEXT, private_key TEXT, friendly_name TEXT, mqtt_server TEXT, mqtt_port INTEGER, mqtt_over_tls BOOLEAN,
+        mqtt_publish_encryption_key TEXT, mqtt_username TEXT, mqtt_userpass TEXT, mqtt_topic TEXT,
+        PRIMARY KEY(private_key));'''
+
+# Execute the SQL query
+_sq3.execute(create_table_query)
+
+# SQL query to create a table named 'report' if it does not exist
+create_table_query = '''CREATE TABLE IF NOT EXISTS reports (
+id_short TEXT, timestamp INTEGER, datePublished INTEGER, payload TEXT, 
+id TEXT, statusCode INTEGER, lat TEXT, lon TEXT, conf INTEGER, PRIMARY KEY(id_short,timestamp));'''
+
+# Execute the SQL query
+_sq3.execute(create_table_query)
+
+
+def private_key_from_json(private_keys: str) -> set():
+    valid_private_keys = set()
+    invalid_private_keys = set()
+
+    re_exp = r"^[-A-Za-z0-9+/]*={0,3}$"
+    for key in private_keys.strip().split(','):
+        if len(key) != 40 or not re.match(re_exp, key):
+            invalid_private_keys.add(key)
+        else:
+            if len(key) > 0:
+                valid_private_keys.add(key)
+
+    return valid_private_keys, invalid_private_keys
 
 
 def private_to_hashed_key(private_key_b64: str) -> str:
@@ -108,32 +143,7 @@ def decrypt_payload(report: str, private_key: str) -> {}:
     return result
 
 
-@app.post("/SingleDeviceEncryptedReports/", summary="Retrieve reports for one device at a time.")
-async def single_device_encrypted_reports(
-        advertisement_key: str = Query(
-            description="Hashed Advertisement Base64 Key.",
-            min_length=44, max_length=44, regex=r"^[-A-Za-z0-9+/]*={0,3}$"),
-        hours: int = Query(1, description="Hours to search back in time", ge=1, le=24)):
-    unix_epoch = int(datetime.datetime.now().strftime('%s'))
-    start_date = unix_epoch - (60 * 60 * hours)
-    data = {"search": [{"startDate": start_date * 1000, "endDate": unix_epoch * 1000,
-                        "ids": [advertisement_key.strip().replace(" ", "")]}]}
-
-    r = requests.post("https://gateway.icloud.com/acsnservice/fetch",
-                      auth=(dsid, searchPartyToken),
-                      headers=generate_anisette_headers(),
-                      json=data)
-
-    return json.loads(r.content.decode(encoding='utf-8'))
-
-
-@app.post("/MultipleDeviceEncryptedReports/", summary="Retrieve reports for multiple devices at a time.")
-async def multiple_device_encrypted_reports(
-        advertisement_keys: Annotated[str, Body(
-            description="Hashed Advertisement Base64 Key. Separate each key by a comma.",
-            media_type="text/plain")],
-
-        hours: int = Query(1, description="Hours to search back in time", ge=1, le=24)):
+def get_report_from_upstream(advertisement_keys: str, hours: int) -> {}:
     re_exp = r"^[-A-Za-z0-9+/]*={0,3}$"
     advertisement_keys_list = []
     advertisement_keys_invalid_list = set()
@@ -166,6 +176,35 @@ async def multiple_device_encrypted_reports(
                       json=data)
 
     return json.loads(r.content.decode(encoding='utf-8'))
+
+
+@app.post("/SingleDeviceEncryptedReports/", summary="Retrieve reports for one device at a time.")
+async def single_device_encrypted_reports(
+        advertisement_key: str = Query(
+            description="Hashed Advertisement Base64 Key.",
+            min_length=44, max_length=44, regex=r"^[-A-Za-z0-9+/]*={0,3}$"),
+        hours: int = Query(1, description="Hours to search back in time", ge=1, le=24)):
+    unix_epoch = int(datetime.datetime.now().strftime('%s'))
+    start_date = unix_epoch - (60 * 60 * hours)
+    data = {"search": [{"startDate": start_date * 1000, "endDate": unix_epoch * 1000,
+                        "ids": [advertisement_key.strip().replace(" ", "")]}]}
+
+    r = requests.post("https://gateway.icloud.com/acsnservice/fetch",
+                      auth=(dsid, searchPartyToken),
+                      headers=generate_anisette_headers(),
+                      json=data)
+
+    return json.loads(r.content.decode(encoding='utf-8'))
+
+
+@app.post("/MultipleDeviceEncryptedReports/", summary="Retrieve reports for multiple devices at a time.")
+async def multiple_device_encrypted_reports(
+        advertisement_keys: Annotated[str, Body(
+            description="Hashed Advertisement Base64 Key. Separate each key by a comma.",
+            media_type="text/plain")],
+
+        hours: int = Body(1, description="Hours to search back in time", ge=1, le=24)):
+    return get_report_from_upstream(advertisement_keys, hours)
 
 
 @app.post("/Decryption/", summary="Decrypt reports for one or many devices.")
@@ -244,5 +283,135 @@ async def report_decryption(
 
     return valid_reports
 
+
+@app.post("/KeyToMonitor/", summary="Add a key to monitor db.")
+async def key_to_monitor(
+        private_key: Annotated[str | None, Body(
+            description="**Private Key is a secret and shall not be provided to any untrusted website!**")] = None,
+        friendly_name: Annotated[str, Body(description="Friendly name for the key")] = "",
+        mqtt_server: Annotated[str, Body(description="MQTT Server")] = "127.0.0.1",
+        mqtt_port: Annotated[int, Body(description="MQTT Port")] = 1883,
+        mqtt_topic: Annotated[str, Body(description="MQTT Topic")] = "",
+        mqtt_publish_encryption_key: Annotated[str, Body(description="MQTT Publish Encryption Key")] = "",
+        mqtt_username: Annotated[str, Body(description="MQTT Username")] = "",
+        mqtt_userpass: Annotated[str, Body(description="MQTT Userpass")] = "",
+        mqtt_over_tls: Annotated[bool, Body(description="MQTT over TLS")] = False,
+):
+    valid_private_keys, invalid_private_keys = private_key_from_json(private_key)
+
+    if len(valid_private_keys) == 0:
+        return JSONResponse(
+            content={"error": f"No valid Private Key(s) found"},
+            status_code=400)
+
+    logging.info(f"private_key: {private_key}, friendly_name: {friendly_name}, mqtt_server: {mqtt_server}, \n"
+                 f"mqtt_port: {mqtt_port}, mqtt_publish_encryption_key length: {len(mqtt_publish_encryption_key)}, \n"
+                 f"mqtt_username: {mqtt_username}, mqtt_userpass length: {len(mqtt_userpass)}, mqtt_over_tls: {mqtt_over_tls}")
+
+    for key in valid_private_keys:
+        query = "INSERT OR REPLACE INTO tags VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        parameters = (private_to_hashed_key(key), key, friendly_name, mqtt_server, mqtt_port, mqtt_over_tls,
+                      mqtt_publish_encryption_key, mqtt_username, mqtt_userpass, mqtt_topic)
+        _sq3.execute(query, parameters)
+
+    sq3db.commit()
+    return JSONResponse(
+        content={"success": f"Private key added to monitor db"},
+        status_code=200)
+
+
+# Get the reports from the upstream and decrypt them, save the result to the reports table
+def sync_latest_decrypted_reports():
+    hash_adv_keys = _sq3.execute("SELECT hash_adv_key FROM tags")
+    hash_adv_keys = set([item[0] for item in hash_adv_keys])
+    reports = get_report_from_upstream(",".join(hash_adv_keys), 1)
+    if "results" in reports:
+        for report in reports["results"]:
+            if report["id"] in hash_adv_keys:
+                clear_text = decrypt_payload(report['payload'], _sq3.execute(
+                    "SELECT private_key FROM tags WHERE hash_adv_key = ?", (report["id"],)).fetchone()[0])
+
+                # id_short TEXT, timestamp INTEGER, datePublished INTEGER, payload TEXT,
+                # id TEXT, statusCode INTEGER, lat TEXT, lon TEXT, conf INTEGER
+
+                logging.debug(report)
+                logging.debug(clear_text)
+                query = "INSERT OR REPLACE INTO reports VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                parameters = (report["id"][:7], clear_text['timestamp'], report['datePublished'], report['payload'],
+                              report['id'], clear_text['status'], clear_text['lat'], clear_text['lon'],
+                              clear_text['confidence'])
+                _sq3.execute(query, parameters)
+        sq3db.commit()
+    else:
+        logging.error(f"Upstream informed an error. {reports['statusCode']}", exc_info=True)
+
+
+@app.post("/publish_mqtt/", summary="Trigger a publish action to MQTT Servers")
+async def publish_mqtt():
+    """
+    When this api is triggered, it will query the latest report from Apple, save to the database,
+    then and publish it to the MQTT server which previously declared and saved in the database.
+    """
+    import paho.mqtt.publish as publish
+
+    # hash_adv_key TEXT, private_key TEXT, friendly_name TEXT, mqtt_server TEXT, mqtt_port INTEGER, mqtt_over_tls BOOLEAN,
+    # mqtt_publish_encryption_key TEXT, mqtt_username TEXT, mqtt_userpass TEXT, mqtt_topic TEXT
+
+    for tag in _sq3.execute("SELECT * FROM tags"):
+        logging.info(f"Publishing MQTT for {tag[2]}")
+        if tag[6] != "":
+            logging.info(f"Publishing MQTT for {tag[2]}")
+
+    sync_latest_decrypted_reports()
+
+    tags = _sq3.execute(
+        "SELECT hash_adv_key,friendly_name,mqtt_server,mqtt_port,lat,lon,timestamp,"
+        "mqtt_over_tls,mqtt_publish_encryption_key,mqtt_username,mqtt_userpass,mqtt_topic "
+        "FROM tags,reports "
+        "WHERE reports.id = tags.hash_adv_key "
+        "ORDER BY timestamp DESC LIMIT 1")
+
+    try:
+        for tag in tags:
+            logging.debug(f"\n"
+                          f"tag[0]: {tag[0]} \n"
+                          f"tag[1]: {tag[1]} \n"
+                          f"tag[2]: {tag[2]} \n"
+                          f"tag[3]: {tag[3]} \n"
+                          f"tag[4]: {tag[4]} \n"
+                          f"tag[5]: {tag[5]} \n"
+                          f"tag[6]: {tag[6]} \n"
+                          f"tag[7]: {tag[7]} \n"
+                          f"tag[8]: {tag[8]} \n"
+                          f"tag[9]: {tag[9]} \n"
+                          f"tag[10]: {tag[10]} \n"
+                          f"tag[11]: {tag[11]}")
+
+            # https://owntracks.org/booklet/tech/json/#_typelocation
+            report = {"_type": "location",
+                      "lat": tag[4],
+                      "lon": tag[5],
+                      "timestamp": tag[6],
+                      "tag": tag[1]
+                      }
+
+            publish.single(
+                topic=f"owntracks/{tag[9]}/{tag[0]}",  # owntracks/<username>/<device_id>
+                payload=json.dumps(report, separators=(',', ':')),
+                qos=1, retain=True, hostname=tag[2],
+                port=int(tag[3]), client_id=tag[9], keepalive=60, will=None,
+                auth={'username': tag[9], 'password': tag[10]},
+                transport="tcp")
+
+            return JSONResponse(
+                content={"success": f"Publish MQTT"},
+                status_code=200)
+    except Exception as e:
+        logging.error(f"Publish MQTT Failed: {e}", exc_info=True)
+        return JSONResponse(
+            content={"error": f"Publish MQTT Failed"},
+            status_code=400)
+
+
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info")
+    uvicorn.run("web_service:app", host="127.0.0.1", port=8000, log_level="info")
