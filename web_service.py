@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 import base64
 import logging
 import uvicorn
+import time
 
 logging.basicConfig(level=logging.INFO)
 
@@ -33,6 +34,7 @@ app = FastAPI(
                 "\n**Public Key / Advertisement Key:** Derive from the private key, used for broadcasting.  "
                 "\n**Hashed Advertisement Key:** SHA256 hashed public key, used for querying reports.  "
 )
+app.last_publish_time = 0
 
 CONFIG_PATH = os.path.dirname(os.path.realpath(__file__)) + "/keys/auth.json"
 if os.path.exists(CONFIG_PATH):
@@ -361,6 +363,15 @@ async def publish_mqtt():
     query the latest reports from Apple, save the reports to database,
     then and publish it to the MQTT server which previously declared and saved in the database.
     """
+
+    if time.time() - app.last_publish_time < 60:
+        return JSONResponse(
+            content={
+                "error": f"Publish MQTT too often, please wait for "
+                         f"{int(60 - (time.time() - app.last_publish_time))} seconds"},
+            status_code=400)
+    else:
+        app.last_publish_time = time.time()
     import paho.mqtt.publish as publish
     import certifi
     ca_path = certifi.where()
