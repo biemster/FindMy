@@ -23,6 +23,8 @@ import base64
 import logging
 import uvicorn
 import time
+import paho.mqtt.publish as publish
+import certifi
 
 logging.basicConfig(level=logging.INFO)
 
@@ -372,8 +374,7 @@ async def publish_mqtt():
             status_code=400)
     else:
         app.last_publish_time = time.time()
-    import paho.mqtt.publish as publish
-    import certifi
+
     ca_path = certifi.where()
     # hash_adv_key TEXT, private_key TEXT, friendly_name TEXT, mqtt_server TEXT, mqtt_port INTEGER, mqtt_over_tls BOOLEAN,
     # mqtt_publish_encryption_key TEXT, mqtt_username TEXT, mqtt_userpass TEXT, mqtt_topic TEXT
@@ -389,6 +390,11 @@ async def publish_mqtt():
         "ORDER BY timestamp ;").fetchall()
 
     logging.debug(f"tags to send. {tags}")
+
+    if len(tags) == 0:
+        return JSONResponse(
+            content={"error": f"No valid reports found"},
+            status_code=400)
     try:
         for tag in tags:
             logging.debug(f"\n"
