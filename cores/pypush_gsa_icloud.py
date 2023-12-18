@@ -25,7 +25,7 @@ srp.no_username_in_x()
 # Disable SSL Warning
 import urllib3
 
-urllib3.disable_warnings()
+# urllib3.disable_warnings()
 
 ANISETTE_URL = 'http://localhost:6969'  # https://github.com/Dadoum/anisette-v3-server
 

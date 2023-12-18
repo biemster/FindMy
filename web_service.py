@@ -15,6 +15,7 @@ from fastapi import FastAPI, UploadFile, Header, Body
 import requests
 from fastapi.params import Query, File
 from fastapi.responses import JSONResponse
+
 from cores.pypush_gsa_icloud import icloud_login_mobileme, generate_anisette_headers
 from cryptography.hazmat.primitives.asymmetric import ec
 
@@ -22,7 +23,7 @@ import base64
 import logging
 import uvicorn
 
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
     title="FindMy Gateway API",
@@ -55,7 +56,7 @@ _sq3 = sq3db.cursor()
 create_table_query = '''CREATE TABLE IF NOT EXISTS tags (
         hash_adv_key TEXT, private_key TEXT, friendly_name TEXT, mqtt_server TEXT, mqtt_port INTEGER, mqtt_over_tls BOOLEAN,
         mqtt_publish_encryption_key TEXT, mqtt_username TEXT, mqtt_userpass TEXT, mqtt_topic TEXT,
-        PRIMARY KEY(private_key));'''
+        PRIMARY KEY(private_key,mqtt_server));'''
 
 # Execute the SQL query
 _sq3.execute(create_table_query)
@@ -63,7 +64,7 @@ _sq3.execute(create_table_query)
 # SQL query to create a table named 'report' if it does not exist
 create_table_query = '''CREATE TABLE IF NOT EXISTS reports (
 id_short TEXT, timestamp INTEGER, datePublished INTEGER, payload TEXT, 
-id TEXT, statusCode INTEGER, lat TEXT, lon TEXT, conf INTEGER, PRIMARY KEY(id_short,timestamp));'''
+id TEXT, statusCode INTEGER, lat TEXT, lon TEXT, conf INTEGER, PRIMARY KEY(id,payload));'''
 
 # Execute the SQL query
 _sq3.execute(create_table_query)
@@ -297,6 +298,13 @@ async def key_to_monitor(
         mqtt_userpass: Annotated[str, Body(description="MQTT Userpass")] = "",
         mqtt_over_tls: Annotated[bool, Body(description="MQTT over TLS")] = False,
 ):
+    """
+    **Private Key and UserPass are secrets, you shall not provide them to any untrusted website!**<br>
+    **Private Key and UserPass are secrets, you shall not provide them to any untrusted website!**<br>
+    **Private Key and UserPass are secrets, you shall not provide them to any untrusted website!**<br>
+
+    When this api is triggered, it will save the private key and MQTT credentials to the database.
+    """
     valid_private_keys, invalid_private_keys = private_key_from_json(private_key)
 
     if len(valid_private_keys) == 0:
@@ -304,9 +312,9 @@ async def key_to_monitor(
             content={"error": f"No valid Private Key(s) found"},
             status_code=400)
 
-    logging.info(f"private_key: {private_key}, friendly_name: {friendly_name}, mqtt_server: {mqtt_server}, \n"
-                 f"mqtt_port: {mqtt_port}, mqtt_publish_encryption_key length: {len(mqtt_publish_encryption_key)}, \n"
-                 f"mqtt_username: {mqtt_username}, mqtt_userpass length: {len(mqtt_userpass)}, mqtt_over_tls: {mqtt_over_tls}")
+    logging.debug(f"private_key: {private_key}, friendly_name: {friendly_name}, mqtt_server: {mqtt_server}, \n"
+                  f"mqtt_port: {mqtt_port}, mqtt_publish_encryption_key length: {len(mqtt_publish_encryption_key)}, \n"
+                  f"mqtt_username: {mqtt_username}, mqtt_userpass length: {len(mqtt_userpass)}, mqtt_over_tls: {mqtt_over_tls}")
 
     for key in valid_private_keys:
         query = "INSERT OR REPLACE INTO tags VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -346,10 +354,11 @@ def sync_latest_decrypted_reports():
         logging.error(f"Upstream informed an error. {reports['statusCode']}", exc_info=True)
 
 
-@app.post("/publish_mqtt/", summary="Trigger a publish action to MQTT Servers")
+@app.post("/Publish_MQTT/", summary="Trigger a publish action to MQTT Servers")
 async def publish_mqtt():
     """
-    When this api is triggered, it will query the latest report from Apple, save to the database,
+    When this api is triggered, it will read all the private keys have been register by using the api "KeyToMonitor",
+    query the latest reports from Apple, save the reports to database,
     then and publish it to the MQTT server which previously declared and saved in the database.
     """
     import paho.mqtt.publish as publish
@@ -357,20 +366,17 @@ async def publish_mqtt():
     # hash_adv_key TEXT, private_key TEXT, friendly_name TEXT, mqtt_server TEXT, mqtt_port INTEGER, mqtt_over_tls BOOLEAN,
     # mqtt_publish_encryption_key TEXT, mqtt_username TEXT, mqtt_userpass TEXT, mqtt_topic TEXT
 
-    for tag in _sq3.execute("SELECT * FROM tags"):
-        logging.info(f"Publishing MQTT for {tag[2]}")
-        if tag[6] != "":
-            logging.info(f"Publishing MQTT for {tag[2]}")
-
     sync_latest_decrypted_reports()
 
     tags = _sq3.execute(
-        "SELECT hash_adv_key,friendly_name,mqtt_server,mqtt_port,lat,lon,timestamp,"
-        "mqtt_over_tls,mqtt_publish_encryption_key,mqtt_username,mqtt_userpass,mqtt_topic "
-        "FROM tags,reports "
-        "WHERE reports.id = tags.hash_adv_key "
-        "ORDER BY timestamp DESC LIMIT 1")
+        "SELECT hash_adv_key, friendly_name, mqtt_server, mqtt_port, lat, lon, timestamp, mqtt_over_tls,"
+        "mqtt_publish_encryption_key, mqtt_username, mqtt_userpass, mqtt_topic "
+        "FROM tags, reports "
+        "WHERE reports.id = tags.hash_adv_key AND lat IS NOT NULL AND lon IS NOT NULL "
+        "GROUP BY hash_adv_key, mqtt_server "
+        "ORDER BY timestamp;").fetchall()
 
+    logging.debug(f"tags to send. {tags}")
     try:
         for tag in tags:
             logging.debug(f"\n"
@@ -395,17 +401,31 @@ async def publish_mqtt():
                       "tag": tag[1]
                       }
 
-            publish.single(
-                topic=f"owntracks/{tag[9]}/{tag[0]}",  # owntracks/<username>/<device_id>
-                payload=json.dumps(report, separators=(',', ':')),
-                qos=1, retain=True, hostname=tag[2],
-                port=int(tag[3]), client_id=tag[9], keepalive=60, will=None,
-                auth={'username': tag[9], 'password': tag[10]},
-                transport="tcp")
+            if tag[7]:
+                import certifi
+                logging.info(f"Publishing MQTT for {tag[0]} to {tag[2]}")
+                ca_path = certifi.where()
+                publish.single(
+                    topic=f"owntracks/{tag[9]}/{tag[0]}",  # owntracks/<username>/<device_id>
+                    payload=json.dumps(report, separators=(',', ':')),
+                    qos=1, retain=True, hostname=tag[2], client_id=tag[9],
+                    port=int(tag[3]), keepalive=60, will=None, tls={"ca_certs": ca_path},
+                    auth={'username': tag[9], 'password': tag[10]},
+                    transport="tcp")
 
-            return JSONResponse(
-                content={"success": f"Publish MQTT"},
-                status_code=200)
+            else:
+                logging.info(f"Publishing MQTT for {tag[0]} to {tag[2]}")
+                publish.single(
+                    topic=f"owntracks/{tag[9]}/{tag[0]}",  # owntracks/<username>/<device_id>
+                    payload=json.dumps(report, separators=(',', ':')),
+                    qos=1, retain=True, hostname=tag[2], client_id=tag[9],
+                    port=int(tag[3]), keepalive=60, will=None, tls=None,
+                    auth={'username': tag[9], 'password': tag[10]},
+                    transport="tcp")
+
+        return JSONResponse(
+            content={"success": f"Publish MQTT"},
+            status_code=200)
     except Exception as e:
         logging.error(f"Publish MQTT Failed: {e}", exc_info=True)
         return JSONResponse(
