@@ -132,18 +132,7 @@ nohup uvicorn web_service:app --reload &
 
 <br>
 
-
-
-## Untested Section
-Alternatively to step 3 you could install `https://github.com/Dadoum/pyprovision` (first install `anisette-v3-server`
-though to get a nice D environment and the required android libs),
-make a folder `anisette` in your working directory and just run
-
-``` commandline
-./request_reports.py
-```
-
-The script should pick up the python bindings to provision and use that instead.
-
-This current non-Mac workflow is not optimal yet, mainly because the anisette server is a bit of a workaround. A python
-solution for retrieving this is being developed in the pypush discord, please join there if you want to contribute!
+## API Usage
+The APIs are created with FastAPI, the documentations are written inline and can be accessed on website 
+path http://127.0.0.1:8000/docs or http://127.0.0.1:8000/redoc. 
+The project is currently under development, which may lead to frequent changes of the APIs. Please use with cautious.

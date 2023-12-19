@@ -32,7 +32,7 @@ app = FastAPI(
     title="FindMy Gateway API",
     summary="Query Apple's Find My network, allowing none Apple devices to retrieve the location reports.",
     description="### Important Concepts:  "
-                "\n**Private Key:** Generated on your device as a secret, used for decrypting the report.  "
+                "\n**Private Key:** Use for decrypting the report.  "
                 "\n**Public Key / Advertisement Key:** Derive from the private key, used for broadcasting.  "
                 "\n**Hashed Advertisement Key:** SHA256 hashed public key, used for querying reports.  "
 )
@@ -187,7 +187,11 @@ async def single_device_encrypted_reports(
         advertisement_key: str = Query(
             description="Hashed Advertisement Base64 Key.",
             min_length=44, max_length=44, regex=r"^[-A-Za-z0-9+/]*={0,3}$"),
-        hours: int = Query(1, description="Hours to search back in time", ge=1, le=24)):
+        hours: int = Query(1, description="Hours to search back in time", ge=1, le=24),):
+    """
+    Enter one hashed advertisement key in base64 format, and the hours to search back in time. <br>
+    The API will attempt to retrieve the reports from Apple and provide as a JSON response. <br>
+    """
     unix_epoch = int(datetime.datetime.now().strftime('%s'))
     start_date = unix_epoch - (60 * 60 * hours)
     data = {"search": [{"startDate": start_date * 1000, "endDate": unix_epoch * 1000,
@@ -208,6 +212,10 @@ async def multiple_device_encrypted_reports(
             media_type="text/plain")],
 
         hours: int = Body(1, description="Hours to search back in time", ge=1, le=24)):
+    """
+    Enter one or multiple hashed advertisement key(s) in base64 format, and the hours to search back in time. <br>
+    The API will attempt to retrieve the reports from Apple and provide as a JSON response. <br>
+    """
     return get_report_from_upstream(advertisement_keys, hours)
 
 
@@ -219,6 +227,11 @@ async def report_decryption(
                                    description="The JSON response from MultipleDeviceEncryptedReports or "
                                                "SingleDeviceEncryptedReports"),
         skip_invalid: bool = Query(description="Ignore report and private mismatch", default=False)):
+    """
+    Upload the JSON response from MultipleDeviceEncryptedReports or SingleDeviceEncryptedReports,<br>
+    and the private key(s) in base64 format to decrypt the reports.<br>
+    Choose True or False to skip any format invalid private key <br>
+    """
     valid_private_keys = set()
     invalid_private_keys = set()
 
@@ -292,13 +305,13 @@ async def report_decryption(
 async def key_to_monitor(
         private_key: Annotated[str | None, Body(
             description="**Private Key is a secret and shall not be provided to any untrusted website!**")] = None,
-        friendly_name: Annotated[str, Body(description="Friendly name for the key")] = "",
+        friendly_name: Annotated[str, Body(description="Friendly name for the key")] = "HayTag",
         mqtt_server: Annotated[str, Body(description="MQTT Server")] = "127.0.0.1",
         mqtt_port: Annotated[int, Body(description="MQTT Port")] = 1883,
-        mqtt_topic: Annotated[str, Body(description="MQTT Topic")] = "",
-        mqtt_publish_encryption_key: Annotated[str, Body(description="MQTT Publish Encryption Key")] = "",
-        mqtt_username: Annotated[str, Body(description="MQTT Username")] = "",
-        mqtt_userpass: Annotated[str, Body(description="MQTT Userpass")] = "",
+        # mqtt_topic: Annotated[str, Body(description="MQTT Topic")] = "",
+        # mqtt_publish_encryption_key: Annotated[str, Body(description="MQTT Publish Encryption Key")] = "",
+        mqtt_username: Annotated[str, Body(description="MQTT Username")] = "USERNAME",
+        mqtt_userpass: Annotated[str, Body(description="MQTT Userpass")] = "PASSWORD",
         mqtt_over_tls: Annotated[bool, Body(description="MQTT over TLS")] = False,
 ):
     """
@@ -315,14 +328,16 @@ async def key_to_monitor(
       "friendly_name": "OwnTags",
       "mqtt_server": "xxx.com or 222.111.0.123",
       "mqtt_port": 8883,
-      "mqtt_topic": "Does Not Work at this moment. Leave it empty if you don't want to specify the topic.",
-      "mqtt_publish_encryption_key": "Does Not Work at this moment. Leave it empty if you don't want to encrypt the payload",
+      "mqtt_topic": "Does Not Work at this moment. ",
+      "mqtt_publish_encryption_key": "Does Not Work at this moment. ",
       "mqtt_username": "USERNAME",
       "mqtt_userpass": "PASSWORD",
       "mqtt_over_tls": true or false
     }
     ```
     """
+
+    mqtt_topic, mqtt_publish_encryption_key = "", ""
     valid_private_keys, invalid_private_keys = private_key_from_json(private_key)
 
     if len(valid_private_keys) == 0:
@@ -493,6 +508,7 @@ async def tag_removal(
     return JSONResponse(
         content={"success": f"Key(s) removed from database"},
         status_code=200)
+
 
 if __name__ == "__main__":
     uvicorn.run("web_service:app", host="127.0.0.1", port=8000, log_level="error")
