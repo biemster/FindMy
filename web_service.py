@@ -16,6 +16,7 @@ import requests
 from fastapi.params import Query, File
 from fastapi.responses import JSONResponse
 
+from request_reports import getAuth
 from cores.pypush_gsa_icloud import icloud_login_mobileme, generate_anisette_headers
 from cryptography.hazmat.primitives.asymmetric import ec
 
@@ -511,4 +512,5 @@ async def tag_removal(
 
 
 if __name__ == "__main__":
+    getAuth()
     uvicorn.run("web_service:app", host="127.0.0.1", port=8000, log_level="error")

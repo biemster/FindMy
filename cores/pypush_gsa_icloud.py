@@ -32,7 +32,7 @@ ANISETTE_URL = 'http://localhost:6969'  # https://github.com/Dadoum/anisette-v3-
 
 def icloud_login_mobileme(username='', password='', second_factor='sms'):
     if not username:
-        username = input('Apple ID: ')
+        username = getpass('Apple ID: ')
     if not password:
         password = getpass('Password: ')
 
