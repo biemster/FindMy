@@ -50,7 +50,13 @@ guides found on the internet.
 **Using your personal Apple ID is strongly discouraged, I recommended to create a blank 
 Apple ID for experimental purpose.**  
 
-1. Install docker. [How to Install Docker on Ubuntu](https://docs.docker.com/engine/install/ubuntu/). 
+
+📺 Installation and Walkthrough Video: https://youtu.be/yC2HIPDSxlM
+
+
+### Steps
+
+1. Install docker and Python3-pip. [How to Install Docker on Ubuntu](https://docs.docker.com/engine/install/ubuntu/). Python3-venv is also strongly recommended.
 
 2. The anisetter service shall run on the same device of this project. For Linux system, deploy with docker is recommended.
 If the system rebooted, this docker service will automatically start after reboot.
