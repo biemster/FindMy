@@ -48,7 +48,7 @@ This project only need a free Apple ID with SMS 2FA properly setup. If you don't
 guides found on the internet. 
 
 **Using your personal Apple ID is strongly discouraged, I recommended to create a blank 
-Apple ID for experimental purpose.**  
+Apple ID for experimental purpose.**  If you ran into issue of "KeyError service-data", especially you are using an existing account rather than a new account, you may want to refer to https://github.com/Chapoly1305/FindMy/issues/9 .
 
 
 📺 Installation and Walkthrough Video: https://youtu.be/yC2HIPDSxlM
