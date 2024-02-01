@@ -261,7 +261,7 @@ def trusted_second_factor(dsid, idms_token):
     )
 
     # Prompt for the 2FA code. It's just a string like '123456', no dashes or spaces
-    code = getpass.getpass("Enter 2FA code: ")
+    code = getpass("Enter 2FA code: ")
     headers["security-code"] = code
 
     # Send the 2FA code to Apple
