@@ -85,6 +85,13 @@ if __name__ == "__main__":
         timestamp = int.from_bytes(data[0:4], 'big') +978307200
         sq3.execute(f"INSERT OR REPLACE INTO reports VALUES ('{names[report['id']]}', {timestamp}, {report['datePublished']}, '{report['payload']}', '{report['id']}', {report['statusCode']})")
         if timestamp >= startdate:
+
+            # account for longer payloads sent by some iOS versions, likely 17.5.1.
+            # Patch from https://github.com/biemster/FindMy/issues/52#issuecomment-2056840822
+            if len(data) > 88:
+                print(f"Discarding extra byte in report: { data[5]:02x}.")
+                data = data[0:4] + data[5:]
+
             eph_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP224R1(), data[5:62])
             shared_key = ec.derive_private_key(priv, ec.SECP224R1(), default_backend()).exchange(ec.ECDH(), eph_key)
             symmetric_key = sha256(shared_key + b'\x00\x00\x00\x01' + data[5:62])
