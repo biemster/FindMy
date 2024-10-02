@@ -1,3 +1,4 @@
+import os
 from getpass import getpass
 import plistlib as plist
 import json
@@ -159,9 +160,9 @@ def generate_anisette_headers():
         import pyprovision
         from ctypes import c_ulonglong
         import secrets
-        adi = pyprovision.ADI("./anisette/")
-        adi.provisioning_path = "./anisette/"
-        device = pyprovision.Device("./anisette/device.json")
+        adi = pyprovision.ADI(os.path.dirname(os.path.realpath(__file__)) + "/anisette/")
+        adi.provisioning_path = os.path.dirname(os.path.realpath(__file__)) + "/anisette/"
+        device = pyprovision.Device(os.path.dirname(os.path.realpath(__file__)) + "/anisette/device.json")
         if not device.initialized:
             # Pretend to be a MacBook Pro
             device.server_friendly_description = "<MacBookPro13,2> <macOS;13.1;22C65> <com.apple.AuthKit/1 (com.apple.dt.Xcode/3594.4.19)>"
