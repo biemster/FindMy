@@ -80,6 +80,7 @@ if __name__ == "__main__":
     for report in res:
         priv = int.from_bytes(base64.b64decode(privkeys[report['id']]), 'big')
         data = base64.b64decode(report['payload'])
+        if len(data) > 88: data = data[:4] + data[5:]
 
         # the following is all copied from https://github.com/hatomist/openhaystack-python, thanks @hatomist!
         timestamp = int.from_bytes(data[0:4], 'big') +978307200
