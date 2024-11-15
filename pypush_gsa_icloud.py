@@ -71,12 +71,12 @@ def gsa_authenticate(username, password, second_factor='sms'):
 
     r = gsa_authenticated_request({"A2k": A, "ps": ["s2k", "s2k_fo"], "u": username, "o": "init"})
 
-    if r["sp"] != "s2k":
-        print(f"This implementation only supports s2k. Server returned {r['sp']}")
+    if r["sp"] not in ["s2k", "s2k_fo"]:
+        print(f"This implementation only supports s2k and sk2_fo. Server returned {r['sp']}")
         return
 
     # Change the password out from under the SRP library, as we couldn't calculate it without the salt.
-    usr.p = encrypt_password(password, r["s"], r["i"])
+    usr.p = encrypt_password(password, r["s"], r["i"], r["sp"])
 
     M = usr.process_challenge(r["s"], r["B"])
 
@@ -197,8 +197,11 @@ def generate_meta_headers(serial="0", user_id=uuid.uuid4(), device_id=uuid.uuid4
         "X-Apple-I-SRL-NO": serial,  # Serial number
     }
 
-def encrypt_password(password, salt, iterations):
+def encrypt_password(password, salt, iterations, protocol):
+    assert protocol in ["s2k", "s2k_fo"]
     p = hashlib.sha256(password.encode("utf-8")).digest()
+    if protocol == "s2k_fo":
+        p = p.hex().encode("utf-8")
     return pbkdf2.PBKDF2(p, salt, iterations, SHA256).read(32)
 
 def create_session_key(usr, name):
