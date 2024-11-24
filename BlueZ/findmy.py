@@ -21,6 +21,7 @@ adv = [
 ]
 
 subprocess.run(['btmgmt', '-i', 'hci0', 'power', 'off'])
+subprocess.run(['btmgmt', '-i', 'hci0', 'le', 'on'])
 subprocess.run(['btmgmt', '-i', 'hci0', 'connectable', 'on']) # this is needed to set addr, but we don't want it
 subprocess.run(['btmgmt', '-i', 'hci0', 'public-addr', ":".join(hex(c)[2:].zfill(2) for c in ble_mac)])
 subprocess.run(['btmgmt', '-i', 'hci0', 'power', 'on'])
