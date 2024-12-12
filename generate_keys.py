@@ -21,7 +21,8 @@ if args.yaml:
     yaml=open(args.yaml + '.yaml','w')
     yaml.write('  keys:\n')
 
-for i in range(args.nkeys):
+nkeys = 0
+while nkeys < args.nkeys:
     priv = random.getrandbits(224)
     adv = ec.derive_private_key(priv, ec.SECP224R1(), default_backend()).public_key().public_numbers().x
 
@@ -38,13 +39,14 @@ for i in range(args.nkeys):
         print('Advertisement key: %s' % adv_b64)
         print('Hashed adv key: %s' % s256_b64)
 
-    if '/' in s256_b64[:7]:
+    if args.prefix and not s256_b64.startswith(args.prefix):
+        continue
+    elif '/' in s256_b64[:7]:
         print('no key file written, there was a / in the b64 of the hashed pubkey :(')
     else:
+        fname = '%s.keys' % s256_b64[:7]
         if args.prefix:
-            fname = '%s_%s.keys' % (args.prefix, s256_b64[:7])
-        else:
-            fname = '%s.keys' % s256_b64[:7]
+            print(f'writing {fname}')
 
         with open(fname, 'w') as f:
             f.write('Private key: %s\n' % priv_b64)
@@ -53,3 +55,5 @@ for i in range(args.nkeys):
 
         if args.yaml:
             yaml.write('    - "%s"\n' % adv_b64)
+
+        nkeys += 1
